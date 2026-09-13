@@ -1,22 +1,23 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { auth } from "@/lib/auth";
 
-// Protected routes that require authentication
-const protectedRoutes = ["/checkout", "/orders", "/profile", "/admin"];
-const authRoutes = ["/signin", "/signup"];
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  // Protected routes that require authentication
+  const protectedRoutes = ["/checkout", "/orders", "/profile", "/admin"];
+  const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
 
-  // TODO: Implement JWT token verification
-  // const token = request.cookies.get("token")?.value;
+  // If route is protected and user is not authenticated
+  if (isProtected && !req.auth) {
+    const signInUrl = new URL("/signin", req.nextUrl.origin);
+    signInUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(signInUrl);
+  }
 
-  // For now, allow all routes
   return NextResponse.next();
-}
+});
 
 export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ShoppingCart, Search, User, Menu, Heart, X } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { ShoppingCart, Search, User, Menu, Heart, X, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { useState, type FormEvent } from "react";
 
 export default function Navbar() {
   const { cartCount } = useCart();
+  const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -43,7 +45,7 @@ export default function Navbar() {
             <span className="text-2xl font-bold text-primary">ClickCart</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-6 text-sm  font-medium">
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -104,16 +106,40 @@ export default function Navbar() {
                 <span className="text-xs">Wishlist</span>
               </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hidden md:flex flex-col items-center h-auto py-1"
-              >
-                <Link href="/signin" className="flex flex-col items-center">
-                  <User className="w-5 h-5" />
-                  <span className="text-xs">Account</span>
-                </Link>
-              </Button>
+              {session ? (
+                <div className="hidden md:flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex flex-col items-center h-auto py-1"
+                  >
+                    <Link href="/profile" className="flex flex-col items-center">
+                      <User className="w-5 h-5" />
+                      <span className="text-xs">{session.user?.name?.split(" ")[0] || "Account"}</span>
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex flex-col items-center h-auto py-1"
+                    onClick={() => signOut()}
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span className="text-xs">Sign Out</span>
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hidden md:flex flex-col items-center h-auto py-1"
+                >
+                  <Link href="/signin" className="flex flex-col items-center">
+                    <User className="w-5 h-5" />
+                    <span className="text-xs">Account</span>
+                  </Link>
+                </Button>
+              )}
 
               <Button
                 variant="ghost"
@@ -197,14 +223,37 @@ export default function Navbar() {
             </Link>
 
             {/* Account */}
-            <Link
-              href="/signin"
-              onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
-            >
-              <User className="w-5 h-5" />
-              <span>Account</span>
-            </Link>
+            {session ? (
+              <>
+                <Link
+                  href="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <User className="w-5 h-5" />
+                  <span>{session.user?.name || "Profile"}</span>
+                </Link>
+                <button
+                  onClick={() => {
+                    signOut();
+                    setMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>Sign Out</span>
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/signin"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+              >
+                <User className="w-5 h-5" />
+                <span>Account</span>
+              </Link>
+            )}
           </div>
         </div>
       )}
