@@ -128,3 +128,24 @@
     @apply font-sans;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-order,
+  .print-order * {
+    visibility: visible;
+  }
+  .print-order {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 1.5rem;
+    background: white;
+    color: black;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+}

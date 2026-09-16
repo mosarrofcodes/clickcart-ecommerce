@@ -1,43 +1,29 @@
+export interface ProductCategory {
+  id: string;
+  name: string;
+  slug: string;
+  image: string | null;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Product {
-  id: number;
+  id: string;
   title: string;
   description: string;
   price: number;
-  discountPercentage: number;
-  rating: number;
   stock: number;
-  brand: string;
-  category: string;
-  thumbnail: string;
-  images: string[];
-  tags: string[];
-  sku: string;
-  weight: number;
-  dimensions: {
-    width: number;
-    height: number;
-    depth: number;
-  };
-  warrantyInformation: string;
-  shippingInformation: string;
-  availabilityStatus: string;
-  reviews: Review[];
-  returnPolicy: string;
-  minimumOrderQuantity: number;
-  meta: {
-    createdAt: string;
-    updatedAt: string;
-    barcode: string;
-    qrCode: string;
-  };
-}
-
-export interface Review {
+  image: string;
+  brand: string | null;
   rating: number;
-  comment: string;
-  date: string;
-  reviewerName: string;
-  reviewerEmail: string;
+  sku: string;
+  weight: number | null;
+  tags: string[];
+  categoryId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  category: ProductCategory;
 }
 
 export interface CartItem extends Product {
@@ -45,22 +31,67 @@ export interface CartItem extends Product {
 }
 
 export interface Category {
-  slug: string;
+  id: string;
   name: string;
-  url: string;
+  slug: string;
+  image: string | null;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface ProductsResponse {
-  products: Product[];
-  total: number;
-  skip: number;
-  limit: number;
+export interface Review {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: Date;
+  user: {
+    id: string;
+    name: string | null;
+    image: string | null;
+  };
 }
 
 export interface User {
-  id: number;
-  email: string;
+  id: string;
   name: string;
+  email: string;
   role: string;
-  token: string;
+}
+
+export interface AuthUser {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  role?: string;
+}
+
+export interface Address {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  district: string;
+  zipCode: string | null;
+  isDefault: boolean;
+}
+
+export type CouponType = "PERCENT" | "FIXED" | "FREESHIP";
+
+export interface Coupon {
+  id: string;
+  code: string;
+  type: CouponType;
+  value: number;
+  minOrder: number;
+  maxDiscount: number | null;
+  active: boolean;
+  onePerUser: boolean;
+  usageLimit: number | null;
+  timesUsed: number;
+  validFrom: Date | null;
+  validUntil: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }

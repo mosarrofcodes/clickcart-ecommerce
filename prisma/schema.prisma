@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -15,6 +16,7 @@ model User {
   emailVerified DateTime?
   image         String?
   role          Role      @default(CUSTOMER)
+  isBlocked     Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   accounts      Account[]
@@ -22,6 +24,10 @@ model User {
   cart          Cart?
   orders        Order[]
   reviews       Review[]
+  wishlist      Wishlist[]
+  notifications Notification[]
+  notificationPreference NotificationPreference?
+  couponUses    CouponUse[]
   sessions      Session[]
 }
 
@@ -44,6 +50,7 @@ model Product {
   orderItems  OrderItem[]
   category    Category    @relation(fields: [categoryId], references: [id])
   reviews     Review[]
+  wishlistItems Wishlist[]
 }
 
 model Category {
@@ -84,9 +91,12 @@ model Order {
   total     Float
   address   String
   phone     String
+  couponId  String?
+  discount  Float       @default(0)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   user      User        @relation(fields: [userId], references: [id])
+  coupon    Coupon?     @relation(fields: [couponId], references: [id])
   items     OrderItem[]
   payment   Payment?
 }
@@ -172,6 +182,72 @@ model Review {
   @@unique([userId, productId])
 }
 
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model Coupon {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  type        CouponType   @default(PERCENT)
+  value       Float
+  minOrder    Float        @default(0)
+  maxDiscount Float?
+  active      Boolean      @default(true)
+  onePerUser  Boolean      @default(false)
+  usageLimit  Int?
+  timesUsed   Int          @default(0)
+  validFrom   DateTime?
+  validUntil  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  orders      Order[]
+  uses        CouponUse[]
+}
+
+model CouponUse {
+  id       String   @id @default(cuid())
+  couponId String
+  userId   String
+  usedAt   DateTime @default(now())
+  coupon   Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([couponId, userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String?
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  emailOrderUpdates Boolean @default(true)
+  emailPayment      Boolean @default(true)
+  emailMarketing    Boolean @default(false)
+  inAppEnabled      Boolean @default(true)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 enum Role {
   CUSTOMER
   ADMIN
@@ -191,4 +267,10 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REFUNDED
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+  FREESHIP
 }

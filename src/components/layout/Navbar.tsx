@@ -3,20 +3,30 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { ShoppingCart, Search, User, Menu, Heart, X, LogOut } from "lucide-react";
+import { ShoppingCart, Search, User, Menu, Heart, X, LogOut, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCart } from "@/context/CartContext";
-import { useState, type FormEvent } from "react";
+import { useCartStore, selectCartCount } from "@/store/cart";
+import { useWishlistStore, selectWishlistCount } from "@/store/wishlist";
+import { useUIStore } from "@/store/ui";
+import SearchBar from "@/components/search/SearchBar";
+import NotificationBell from "@/components/layout/NotificationBell";
+import MobileNotificationsLink from "@/components/layout/MobileNotificationsLink";
+import { type FormEvent, useState } from "react";
 
 export default function Navbar() {
-  const { cartCount } = useCart();
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = selectCartCount(cartItems);
+  const wishlistItems = useWishlistStore((s) => s.items);
+  const wishlistCount = selectWishlistCount(wishlistItems);
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const menuOpen = useUIStore((s) => s.mobileMenuOpen);
+  const searchOpen = useUIStore((s) => s.searchOpen);
+  const setMenuOpen = useUIStore((s) => s.setMobileMenuOpen);
+  const setSearchOpen = useUIStore((s) => s.setSearchOpen);
   const [searchQuery, setSearchQuery] = useState("");
 
   const isActive = (path: string) => pathname === path;
@@ -27,6 +37,8 @@ export default function Navbar() {
     { href: "/categories", label: "Categories" },
     { href: "/offers", label: "Offers" },
   ];
+
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "ADMIN";
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -64,18 +76,11 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2">
           {searchOpen ? (
-            <form onSubmit={handleSearch} className="flex items-center gap-2">
-              <Input
+            <div className="flex items-center gap-2 w-64 md:w-80">
+              <SearchBar
                 autoFocus
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-48 md:w-64"
+                onClose={() => setSearchOpen(false)}
               />
-              <Button type="submit" size="icon" variant="ghost">
-                <Search className="w-5 h-5" />
-              </Button>
               <Button
                 type="button"
                 size="icon"
@@ -84,7 +89,7 @@ export default function Navbar() {
               >
                 <X className="w-5 h-5" />
               </Button>
-            </form>
+            </div>
           ) : (
             <>
               <Button
@@ -102,12 +107,33 @@ export default function Navbar() {
                 size="sm"
                 className="hidden md:flex flex-col items-center h-auto py-1"
               >
-                <Heart className="w-5 h-5" />
-                <span className="text-xs">Wishlist</span>
+                <Link href="/wishlist" className="relative flex flex-col items-center">
+                  <Heart className="w-5 h-5" />
+                  {wishlistCount > 0 && (
+                    <Badge className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center p-0 text-xs">
+                      {wishlistCount}
+                    </Badge>
+                  )}
+                  <span className="text-xs">Wishlist</span>
+                </Link>
               </Button>
+
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hidden md:flex flex-col items-center h-auto py-1"
+                >
+                  <Link href="/admin" className="flex flex-col items-center">
+                    <ShieldCheck className="w-5 h-5" />
+                    <span className="text-xs">Admin</span>
+                  </Link>
+                </Button>
+              )}
 
               {session ? (
                 <div className="hidden md:flex items-center gap-2">
+                  <NotificationBell />
                   <Button
                     variant="ghost"
                     size="sm"
@@ -222,6 +248,8 @@ export default function Navbar() {
               <span>Wishlist</span>
             </Link>
 
+            <MobileNotificationsLink />
+
             {/* Account */}
             {session ? (
               <>
@@ -233,6 +261,16 @@ export default function Navbar() {
                   <User className="w-5 h-5" />
                   <span>{session.user?.name || "Profile"}</span>
                 </Link>
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <ShieldCheck className="w-5 h-5" />
+                    <span>Admin Dashboard</span>
+                  </Link>
+                )}
                 <button
                   onClick={() => {
                     signOut();

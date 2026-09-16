@@ -1,32 +1,55 @@
+"use client";
+
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/context/CartContext";
+import { useCartStore } from "@/store/cart";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import type { Product } from "@/types";
+import WishlistButton from "@/components/product/WishlistButton";
 
 interface ProductCardProps {
   product: Product;
+  priority?: boolean;
 }
 
-export default function ProductCard({ product }: ProductCardProps) {
-  const { addToCart } = useCart();
+export default function ProductCard({ product, priority = false }: ProductCardProps) {
+  const addItem = useCartStore((s) => s.addItem);
+  const handleAddToCart = async () => {
+    const error = await addItem(product);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    toast.success("Item added to cart!");
+  };
   return (
-    <Card className=" overflow-hidden hover:shadow-lg transition-shadow duration-300 ">
-      <Link href={`/product/${product.id}`}>
-        <div className="overflow-hidden rounded-t-lg">
-          <img
-            src={product.thumbnail}
-            alt={product.title}
-            className="w-full h-48 object-cover hover:scale-105 transition duration-300 cursor-pointer"
-          />
+    <Card className=" overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
+      <div className="relative">
+        <Link href={`/product/${product.id}`}>
+          <div className="overflow-hidden rounded-t-lg">
+            <Image
+              src={product.image}
+              alt={product.title}
+              width={400}
+              height={300}
+              priority={priority}
+              loading={priority ? "eager" : "lazy"}
+              sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
+              className="w-full h-48 object-cover hover:scale-105 transition duration-300 cursor-pointer"
+            />
+          </div>
+        </Link>
+        <div className="absolute top-2 right-2">
+          <WishlistButton product={product} />
         </div>
-      </Link>
+      </div>
 
       <CardContent className="p-4 space-y-2">
         <Badge variant="secondary" className="text-xs capitalize">
-          {product.category}
+          {product.category.name}
         </Badge>
 
         <Link href={`/product/${product.id}`}>
@@ -40,12 +63,10 @@ export default function ProductCard({ product }: ProductCardProps) {
         <Button
           className="w-full"
           size="sm"
-          onClick={() => {
-            addToCart(product);
-            toast.success("Item added to cart!");
-          }}
+          disabled={product.stock === 0}
+          onClick={handleAddToCart}
         >
-          Add to Cart
+          {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
         </Button>
       </CardContent>
     </Card>

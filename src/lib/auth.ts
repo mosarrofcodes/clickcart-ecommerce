@@ -44,6 +44,10 @@ export const {
           return null;
         }
 
+        if (user.isBlocked) {
+          return null;
+        }
+
         return {
           id: user.id,
           email: user.email,

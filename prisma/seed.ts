@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, CouponType, Role } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -297,6 +297,46 @@ async function main() {
       },
     });
     console.log(`Product: ${prod.title}`);
+  }
+
+  // ==================== COUPONS ====================
+  const couponsData = [
+    {
+      code: "SAVE10",
+      type: CouponType.PERCENT,
+      value: 10,
+      minOrder: 20,
+      maxDiscount: null,
+      active: true,
+      onePerUser: true,
+    },
+    {
+      code: "FREESHIP",
+      type: CouponType.FREESHIP,
+      value: 0,
+      minOrder: 0,
+      maxDiscount: null,
+      active: true,
+      onePerUser: false,
+    },
+    {
+      code: "WELCOME5",
+      type: CouponType.FIXED,
+      value: 5,
+      minOrder: 30,
+      maxDiscount: null,
+      active: true,
+      onePerUser: true,
+    },
+  ];
+
+  for (const c of couponsData) {
+    await prisma.coupon.upsert({
+      where: { code: c.code },
+      update: { type: c.type, value: c.value, minOrder: c.minOrder, active: c.active, onePerUser: c.onePerUser },
+      create: c,
+    });
+    console.log(`Coupon: ${c.code}`);
   }
 
   console.log("\nSeeding complete!");
