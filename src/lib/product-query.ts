@@ -1,20 +1,8 @@
 import type { Prisma } from "@prisma/client";
-import { db } from "@/lib/db";
+import { db, withDbRetry } from "@/lib/db";
+import { PRODUCT_SORTS, type ProductSort } from "@/lib/store-config";
 
-export type ProductSort =
-  | "newest"
-  | "price_asc"
-  | "price_desc"
-  | "rating"
-  | "popular";
-
-export const PRODUCT_SORTS: { value: ProductSort; label: string }[] = [
-  { value: "newest", label: "Newest" },
-  { value: "price_asc", label: "Price: Low to High" },
-  { value: "price_desc", label: "Price: High to Low" },
-  { value: "rating", label: "Top Rated" },
-  { value: "popular", label: "Most Reviewed" },
-];
+export { PRODUCT_SORTS, type ProductSort };
 
 export interface ProductQueryParams {
   search?: string;
@@ -135,14 +123,20 @@ export async function getProducts(params: ProductQueryParams = {}) {
   const { where, orderBy, skip, take, page, limit } = buildProductQuery(params);
 
   const [products, total] = await Promise.all([
-    db.product.findMany({
-      where,
-      orderBy,
-      skip,
-      take,
-      include: { category: true },
-    }),
-    db.product.count({ where }),
+    withDbRetry(() =>
+      db.product.findMany({
+        where,
+        orderBy,
+        skip,
+        take,
+        include: {
+          category: true,
+          _count: { select: { reviews: true } },
+          variants: { orderBy: { price: "asc" } },
+        },
+      }),
+    ),
+    withDbRetry(() => db.product.count({ where })),
   ]);
 
   return {
@@ -155,12 +149,14 @@ export async function getProducts(params: ProductQueryParams = {}) {
 }
 
 export async function getDistinctBrands(): Promise<string[]> {
-  const rows = await db.product.findMany({
-    where: { brand: { not: null } },
-    select: { brand: true },
-    distinct: ["brand"],
-    orderBy: { brand: "asc" },
-  });
+  const rows = await withDbRetry(() =>
+    db.product.findMany({
+      where: { brand: { not: null } },
+      select: { brand: true },
+      distinct: ["brand"],
+      orderBy: { brand: "asc" },
+    }),
+  );
   return rows
     .map((r) => r.brand as string)
     .filter((brand, index, all) => brand && all.indexOf(brand) === index);

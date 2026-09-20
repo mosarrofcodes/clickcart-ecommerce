@@ -27,7 +27,7 @@ jest.mock("@/lib/db", () => ({
     cart: { upsert: jest.fn() },
     product: {
       findMany: jest.fn(),
-      updateMany: jest.fn(),
+      update: jest.fn(),
     },
     order: { create: jest.fn() },
     coupon: { update: jest.fn() },
@@ -35,10 +35,12 @@ jest.mock("@/lib/db", () => ({
     cartItem: { deleteMany: jest.fn() },
     $transaction: jest.fn(),
   },
+  withDbRetry: (fn: () => object) => Promise.resolve(fn()),
 }));
 
 jest.mock("@/lib/notification", () => ({
   notifyOrderPlaced: jest.fn(),
+  notifyAdminsNewOrder: jest.fn(),
   lowStockAlerts: jest.fn(),
 }));
 
@@ -46,7 +48,7 @@ const mockRequireUser = requireUser as jest.Mock;
 const mockFindValidCoupon = findValidCoupon as jest.Mock;
 const mockDb = db as unknown as {
   cart: { upsert: jest.Mock };
-  product: { findMany: jest.Mock; updateMany: jest.Mock };
+  product: { findMany: jest.Mock; update: jest.Mock };
   order: { create: jest.Mock };
   coupon: { update: jest.Mock };
   couponUse: { create: jest.Mock };
@@ -87,20 +89,20 @@ describe("POST /api/orders", () => {
       error: { status: 401, _body: { error: "Unauthorized" }, json: async () => ({}) },
     });
 
-    const res = await POST(jsonRequest({ address: "x", phone: "01", paymentMethod: "cash_on_delivery" }));
+    const res = await POST(jsonRequest({ address: "x", city: "Dhaka", phone: "01", paymentMethod: "cash_on_delivery" }));
     expect(res.status).toBe(401);
   });
 
   it("rejects an unknown payment method", async () => {
-    const res = await POST(jsonRequest({ address: "x", phone: "01", paymentMethod: "credit_card" }));
+    const res = await POST(jsonRequest({ address: "x", city: "Dhaka", phone: "01", paymentMethod: "credit_card" }));
     expect(res.status).toBe(400);
   });
 
   it("requires a shipping address and phone number", async () => {
-    const noAddress = await POST(jsonRequest({ phone: "01700000000", paymentMethod: "cash_on_delivery" }));
+    const noAddress = await POST(jsonRequest({ city: "Dhaka", phone: "01700000000", paymentMethod: "cash_on_delivery" }));
     expect(noAddress.status).toBe(400);
 
-    const noPhone = await POST(jsonRequest({ address: "Dhaka", paymentMethod: "cash_on_delivery" }));
+    const noPhone = await POST(jsonRequest({ address: "Dhaka", city: "Dhaka", paymentMethod: "cash_on_delivery" }));
     expect(noPhone.status).toBe(400);
   });
 
@@ -108,17 +110,17 @@ describe("POST /api/orders", () => {
     mockDb.cart.upsert.mockResolvedValue(cartWith([]));
 
     const res = await POST(
-      jsonRequest({ address: "Dhaka", phone: "01700000000", paymentMethod: "cash_on_delivery" }),
+      jsonRequest({ address: "Dhaka", city: "Dhaka", district: "Dhaka", phone: "01700000000", paymentMethod: "cash_on_delivery" }),
     );
     expect(res.status).toBe(400);
   });
 
   it("rejects when stock is insufficient", async () => {
     mockDb.cart.upsert.mockResolvedValue(cartWith([{ productId: "p1", quantity: 3, price: 10 }]));
-    mockDb.product.findMany.mockResolvedValue([{ id: "p1", stock: 2 }]);
+    mockDb.product.findMany.mockResolvedValue([{ id: "p1", stock: 2, variants: [] }]);
 
     const res = await POST(
-      jsonRequest({ address: "Dhaka", phone: "01700000000", paymentMethod: "cash_on_delivery" }),
+      jsonRequest({ address: "Dhaka", city: "Dhaka", district: "Dhaka", phone: "01700000000", paymentMethod: "cash_on_delivery" }),
     );
     expect(res.status).toBe(400);
   });
@@ -144,14 +146,14 @@ describe("POST /api/orders", () => {
     };
 
     mockDb.cart.upsert.mockResolvedValue(cartWith([{ productId: "p1", quantity: 1, price: 20 }]));
-    mockDb.product.findMany.mockResolvedValue([{ id: "p1", stock: 10 }]);
+    mockDb.product.findMany.mockResolvedValue([{ id: "p1", stock: 10, variants: [] }]);
     mockDb.order.create.mockResolvedValue(orderFixture);
     mockDb.$transaction.mockImplementation((ops: unknown[]) => Promise.all(ops as Promise<unknown>[]));
-    mockDb.product.updateMany.mockResolvedValue({ count: 1 });
+    mockDb.product.update.mockResolvedValue({ id: "p1", stock: 9 });
     mockDb.cartItem.deleteMany.mockResolvedValue({ count: 1 });
 
     const res = await POST(
-      jsonRequest({ address: "House 1, Dhaka", phone: "01700000000", paymentMethod: "cash_on_delivery" }),
+      jsonRequest({ address: "House 1, Dhaka", city: "Dhaka", district: "Dhaka", phone: "01700000000", paymentMethod: "cash_on_delivery" }),
     );
     expect(res.status).toBe(201);
 
@@ -159,7 +161,7 @@ describe("POST /api/orders", () => {
     expect(body.id).toBe("oc_123");
     expect(body.total).toBe(24.99);
     expect(body.payment.method).toBe("cash_on_delivery");
-    expect(mockDb.product.updateMany).toHaveBeenCalled();
+    expect(mockDb.product.update).toHaveBeenCalled();
   });
 
   it("applies a valid coupon and persists it on the order", async () => {
@@ -176,7 +178,7 @@ describe("POST /api/orders", () => {
     };
 
     mockDb.cart.upsert.mockResolvedValue(cartWith([{ productId: "p1", quantity: 1, price: 20 }]));
-    mockDb.product.findMany.mockResolvedValue([{ id: "p1", stock: 10 }]);
+    mockDb.product.findMany.mockResolvedValue([{ id: "p1", stock: 10, variants: [] }]);
     mockDb.order.create.mockResolvedValue(orderFixture);
     mockDb.coupon.update.mockResolvedValue({ id: "cp-1", timesUsed: 1 });
     mockDb.couponUse.create.mockResolvedValue({ id: "use-1" });
@@ -185,12 +187,14 @@ describe("POST /api/orders", () => {
       discount: { discountAmount: 3, freeShipping: false },
     });
     mockDb.$transaction.mockImplementation((ops: unknown[]) => Promise.all(ops as Promise<unknown>[]));
-    mockDb.product.updateMany.mockResolvedValue({ count: 1 });
+    mockDb.product.update.mockResolvedValue({ id: "p1", stock: 9 });
     mockDb.cartItem.deleteMany.mockResolvedValue({ count: 1 });
 
     const res = await POST(
       jsonRequest({
         address: "House 1, Dhaka",
+        city: "Dhaka",
+        district: "Dhaka",
         phone: "01700000000",
         paymentMethod: "cash_on_delivery",
         couponCode: "SAVE10",
@@ -214,7 +218,7 @@ describe("POST /api/orders", () => {
     const orderData = mockDb.order.create.mock.calls[0][0].data;
     expect(orderData.couponId).toBe("cp-1");
     expect(orderData.discount).toBe(3);
-    expect(orderData.total).toBe(21.99);
+    expect(orderData.total).toBe(20 + 80 - 3);
   });
 
   it("rejects an invalid coupon", async () => {
@@ -227,6 +231,8 @@ describe("POST /api/orders", () => {
     const res = await POST(
       jsonRequest({
         address: "House 1, Dhaka",
+        city: "Dhaka",
+        district: "Dhaka",
         phone: "01700000000",
         paymentMethod: "cash_on_delivery",
         couponCode: "EXPIRED",

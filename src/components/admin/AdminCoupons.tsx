@@ -23,7 +23,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { COUPON_TYPE_LABELS } from "@/lib/coupon-service";
+import { COUPON_TYPE_LABELS } from "@/lib/store-config";
+import { formatMoney } from "@/lib/currency";
 import type { Coupon, CouponType } from "@prisma/client";
 
 interface AdminCoupon extends Coupon {
@@ -77,7 +78,7 @@ function toForm(coupon: AdminCoupon): CouponForm {
 
 function describeValue(coupon: Pick<Coupon, "type" | "value">) {
   if (coupon.type === "PERCENT") return `${coupon.value}% off`;
-  if (coupon.type === "FIXED") return `$${coupon.value.toFixed(2)} off`;
+  if (coupon.type === "FIXED") return `${formatMoney(coupon.value)} off`;
   return "Free shipping";
 }
 
@@ -380,7 +381,7 @@ export default function AdminCoupons({
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {describeValue(c)}
-                {c.minOrder > 0 && ` • min $${c.minOrder.toFixed(2)}`} •{" "}
+                {c.minOrder > 0 && ` • min ${formatMoney(c.minOrder)}`} •{" "}
                 {c.timesUsed}
                 {c.usageLimit != null ? `/${c.usageLimit}` : ""} used •{" "}
                 {c._count.orders} order{c._count.orders === 1 ? "" : "s"}

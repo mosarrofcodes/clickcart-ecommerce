@@ -17,6 +17,8 @@ model User {
   image         String?
   role          Role      @default(CUSTOMER)
   isBlocked     Boolean   @default(false)
+  resetToken    String?
+  resetTokenExpires DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   accounts      Account[]
@@ -36,6 +38,7 @@ model Product {
   title       String
   description String
   price       Float
+  oldPrice    Float?
   stock       Int         @default(0)
   image       String
   brand       String?
@@ -51,6 +54,22 @@ model Product {
   category    Category    @relation(fields: [categoryId], references: [id])
   reviews     Review[]
   wishlistItems Wishlist[]
+  variants    ProductVariant[]
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  name      String
+  price     Float
+  stock     Int     @default(0)
+  sku       String?
+  image     String?
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems CartItem[]
+
+  @@unique([productId, name])
+  @@index([productId])
 }
 
 model Category {
@@ -77,19 +96,27 @@ model CartItem {
   id        String  @id @default(cuid())
   cartId    String
   productId String
+  variantId String?
+  lineKey   String
   quantity  Int     @default(1)
   cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  @@unique([cartId, productId])
+  @@unique([cartId, lineKey])
+  @@index([cartId, productId])
 }
 
 model Order {
   id        String      @id @default(cuid())
   userId    String
   status    OrderStatus @default(PENDING)
+  subtotal  Float       @default(0)
+  shipping  Float       @default(0)
   total     Float
   address   String
+  city      String?
+  district  String?
   phone     String
   couponId  String?
   discount  Float       @default(0)
@@ -102,13 +129,15 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  productId String
-  quantity  Int
-  price     Float
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id])
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String
+  variantId   String?
+  variantName String?
+  quantity    Int
+  price       Float
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [productId], references: [id])
 }
 
 model Account {
@@ -164,6 +193,8 @@ model Payment {
   method        String
   status        PaymentStatus @default(PENDING)
   amount        Float
+  tranId        String?       @unique
+  sessionKey    String?
   transactionId String?
   createdAt     DateTime      @default(now())
   order         Order         @relation(fields: [orderId], references: [id])
@@ -246,6 +277,17 @@ model NotificationPreference {
   emailMarketing    Boolean @default(false)
   inAppEnabled      Boolean @default(true)
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SiteSetting {
+  key   String @id
+  value String @default("")
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
 }
 
 enum Role {

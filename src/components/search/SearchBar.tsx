@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Search, Loader2, Clock, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatMoney } from "@/lib/currency";
 import type { Product } from "@/types";
 
 const RECENT_KEY = "clickcart-recent-searches";
@@ -208,7 +209,7 @@ export default function SearchBar({ onClose, autoFocus }: SearchBarProps) {
                     className="w-8 h-8 object-cover rounded"
                   />
                   <span className="flex-1 text-sm truncate">{product.title}</span>
-                  <span className="text-sm font-medium">${product.price}</span>
+                  <span className="text-sm font-medium">{formatMoney(product.price)}</span>
                 </Link>
               ))}
             </div>

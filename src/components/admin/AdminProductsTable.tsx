@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatMoney } from "@/lib/currency";
 
 interface AdminProduct {
   id: string;
@@ -151,7 +152,7 @@ export default function AdminProductsTable({ products }: { products: AdminProduc
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{p.category.name}</td>
-                  <td className="px-4 py-3 text-right">${p.price.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right">{formatMoney(p.price)}</td>
                   <td className="px-4 py-3 text-center">
                     <span
                       className={

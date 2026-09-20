@@ -6,6 +6,7 @@ import { Package } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { STATUS_COLORS } from "@/lib/order-status";
+import { formatMoney } from "@/lib/currency";
 
 export const metadata: Metadata = {
   title: "My Orders | ClickCart",
@@ -71,7 +72,7 @@ export default async function OrdersPage() {
                   <p className="text-sm text-muted-foreground">
                     {new Date(order.createdAt).toLocaleDateString()} ·{" "}
                     {order._count.items} item{order._count.items > 1 ? "s" : ""} ·
-                    ${order.total.toFixed(2)}
+                    {formatMoney(order.total)}
                   </p>
                 </div>
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${color}`}>

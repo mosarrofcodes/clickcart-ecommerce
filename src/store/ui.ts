@@ -8,6 +8,7 @@ interface UIState {
   openCartDrawer: () => void;
   closeCartDrawer: () => void;
   toggleCartDrawer: () => void;
+  setCartDrawerOpen: (open: boolean) => void;
   setMobileMenuOpen: (open: boolean) => void;
   toggleMobileMenu: () => void;
   setSearchOpen: (open: boolean) => void;
@@ -25,6 +26,7 @@ export const useUIStore = create<UIState>()((set) => ({
   closeCartDrawer: () => set({ cartDrawerOpen: false }),
   toggleCartDrawer: () =>
     set((state) => ({ cartDrawerOpen: !state.cartDrawerOpen })),
+  setCartDrawerOpen: (open) => set({ cartDrawerOpen: open }),
   setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
   toggleMobileMenu: () =>
     set((state) => ({ mobileMenuOpen: !state.mobileMenuOpen })),

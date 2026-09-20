@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,14 @@ interface ProductCategory {
   id: string;
   name: string;
   slug: string;
+}
+
+interface VariantDraft {
+  id?: string;
+  name: string;
+  price: string;
+  stock: string;
+  sku: string;
 }
 
 interface ProductFormProps {
@@ -31,6 +39,10 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
     title: product?.title ?? "",
     description: product?.description ?? "",
     price: product?.price ? String(product.price) : "",
+    oldPrice:
+      product?.oldPrice && Number(product.oldPrice) > Number(product.price)
+        ? String(product.oldPrice)
+        : "",
     stock: product?.stock != null ? String(product.stock) : "0",
     sku: product?.sku ?? "",
     brand: product?.brand ?? "",
@@ -39,9 +51,24 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
     categoryId: product?.categoryId ?? "",
     image: product?.image ?? "",
   });
+  const [variants, setVariants] = useState<VariantDraft[]>(
+    (product?.variants ?? []).map((v) => ({
+      id: v.id,
+      name: v.name,
+      price: String(v.price),
+      stock: String(v.stock),
+      sku: v.sku ?? "",
+    })),
+  );
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateVariant(index: number, key: keyof VariantDraft, value: string) {
+    setVariants((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, [key]: value } : v)),
+    );
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,12 +83,23 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
     if (!form.sku.trim()) return toast.error("SKU is required");
     if (!form.image) return toast.error("Upload a product image");
 
+    const variantPayload = variants
+      .map((v) => ({
+        id: v.id ?? undefined,
+        name: v.name.trim(),
+        price: Number(v.price),
+        stock: Number(v.stock) || 0,
+        sku: v.sku.trim() || null,
+      }))
+      .filter((v) => v.name && Number.isFinite(v.price) && v.price > 0);
+
     setSaving(true);
     try {
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
         price,
+        oldPrice: Number(form.oldPrice) > price ? Number(form.oldPrice) : null,
         stock: Number(form.stock) || 0,
         sku: form.sku.trim(),
         brand: form.brand.trim() || null,
@@ -72,6 +110,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
           .filter(Boolean),
         categoryId: form.categoryId,
         image: form.image,
+        variants: variantPayload,
       };
 
       const res = await fetch(isEdit ? `/api/products/${product!.id}` : "/api/products", {
@@ -131,6 +170,18 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="oldPrice">Old / Strike-through Price (BDT)</Label>
+              <Input
+                id="oldPrice"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.oldPrice}
+                onChange={(e) => update("oldPrice", e.target.value)}
+                placeholder="Optional — shows a deal badge"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="stock">Stock</Label>
               <Input
                 id="stock"
@@ -182,6 +233,96 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
                 placeholder="Comma separated"
               />
             </div>
+          </div>
+
+          <div className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">
+                Variants (optional)
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setVariants((prev) => [
+                    ...prev,
+                    { name: "", price: "", stock: "0", sku: "" },
+                  ])
+                }
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Variant
+              </Button>
+            </div>
+            {variants.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No variants. Customers purchase the base price and stock above.
+              </p>
+            )}
+            {variants.map((v, index) => (
+              <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                <div className="col-span-4 space-y-1">
+                  <Label className="text-xs">Option name</Label>
+                  <Input
+                    value={v.name}
+                    onChange={(e) =>
+                      updateVariant(index, "name", e.target.value)
+                    }
+                    placeholder="e.g. 128GB / Black"
+                    className="h-9"
+                  />
+                </div>
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Price</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={v.price}
+                    onChange={(e) =>
+                      updateVariant(index, "price", e.target.value)
+                    }
+                    placeholder="0.00"
+                    className="h-9"
+                  />
+                </div>
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Stock</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={v.stock}
+                    onChange={(e) =>
+                      updateVariant(index, "stock", e.target.value)
+                    }
+                    className="h-9"
+                  />
+                </div>
+                <div className="col-span-3 space-y-1">
+                  <Label className="text-xs">SKU</Label>
+                  <Input
+                    value={v.sku}
+                    onChange={(e) => updateVariant(index, "sku", e.target.value)}
+                    placeholder="Optional"
+                    className="h-9"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="col-span-1"
+                  onClick={() =>
+                    setVariants((prev) =>
+                      prev.filter((_, i) => i !== index),
+                    )
+                  }
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
 

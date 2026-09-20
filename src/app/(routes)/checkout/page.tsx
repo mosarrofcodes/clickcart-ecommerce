@@ -1,10 +1,7 @@
 "use client";
 
 import { useCartStore, selectCartTotal } from "@/store/cart";
-import {
-  computeShipping,
-  FREE_SHIPPING_THRESHOLD,
-} from "@/lib/cart-service";
+import { computeShipping } from "@/lib/store-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +9,23 @@ import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, CreditCard, Smartphone, Banknote, Ticket, type LucideIcon } from "lucide-react";
+import {
+  Loader2,
+  CreditCard,
+  Smartphone,
+  Banknote,
+  Ticket,
+  MapPin,
+  type LucideIcon,
+} from "lucide-react";
+import { formatMoney } from "@/lib/currency";
+import { computeEmi } from "@/lib/store-config";
+import type { SiteSettings } from "@/lib/store-config";
+import { SITE_SETTINGS_DEFAULTS, isInsideDhaka } from "@/lib/store-config";
+import { useAuthStore } from "@/store/auth";
+import type { Address } from "@/types";
 
 interface PaymentMethod {
   id: string;
@@ -34,9 +45,8 @@ const PAYMENT_METHODS: PaymentMethod[] = [
   {
     id: "bkash",
     label: "bKash",
-    desc: "Mobile wallet payment (coming soon)",
+    desc: "Pay with bKash via SSLCommerz gateway",
     icon: Smartphone,
-    disabled: true,
   },
   {
     id: "sslcommerz",
@@ -76,6 +86,51 @@ export default function CheckoutPage() {
   } | null>(null);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [placing, setPlacing] = useState(false);
+  const [settings, setSettings] = useState<SiteSettings>(SITE_SETTINGS_DEFAULTS);
+  const isAuthenticated = useAuthStore((s) => s.status === "authenticated");
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
+    null,
+  );
+  const autofilled = useRef(false);
+  const userEdited = useRef(false);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setSettings(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const applyAddress = useCallback((addr: Address) => {
+    setSelectedAddressId(addr.id);
+    setForm({
+      fullName: addr.name,
+      phone: addr.phone,
+      address: addr.address,
+      city: addr.city,
+      district: addr.district,
+      zipCode: addr.zipCode ?? "",
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || autofilled.current) return;
+    fetch("/api/user/addresses")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const list = (data?.addresses ?? []) as Address[];
+        if (list.length === 0) return;
+        autofilled.current = true;
+        setSavedAddresses(list);
+        if (userEdited.current) return;
+        const preferred = list.find((addr) => addr.isDefault) ?? list[0];
+        applyAddress(preferred);
+      })
+      .catch(() => {});
+  }, [isAuthenticated, savedAddresses, applyAddress]);
 
   const applyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
@@ -109,12 +164,29 @@ export default function CheckoutPage() {
 
   const discount = appliedCoupon?.discountAmount ?? 0;
   const freeShipping = appliedCoupon?.freeShipping ?? false;
-  const shipping = freeShipping ? 0 : computeShipping(cartTotal);
+  const shipping = freeShipping
+    ? 0
+    : computeShipping(cartTotal, {
+        district: form.district,
+        insideDhaka: settings.shippingInsideDhaka,
+        outsideDhaka: settings.shippingOutsideDhaka,
+        threshold: settings.freeShippingThreshold,
+      });
   const total = Math.max(0, cartTotal + shipping - discount);
+  const emiInstallment = computeEmi(
+    total,
+    settings.emiMonths,
+    settings.emiInterestRate,
+  );
+  const emiAvailable =
+    settings.emiMonths >= 1 && total >= 5000 && emiInstallment > 0;
 
   const updateForm = (field: keyof typeof form) => (
     e: React.ChangeEvent<HTMLInputElement>,
-  ) => setForm({ ...form, [field]: e.target.value });
+  ) => {
+    userEdited.current = true;
+    setForm({ ...form, [field]: e.target.value });
+  };
 
   const handlePlaceOrder = async () => {
     if (!form.fullName.trim() || !form.address.trim() || !form.city.trim()) {
@@ -145,6 +217,8 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           address,
+          city: form.city.trim(),
+          district: form.district.trim(),
           phone: form.phone.trim(),
           paymentMethod,
           couponCode: appliedCoupon ? appliedCoupon.code : undefined,
@@ -156,11 +230,14 @@ export default function CheckoutPage() {
         return;
       }
 
-      if (paymentMethod === "sslcommerz") {
+      if (paymentMethod === "sslcommerz" || paymentMethod === "bkash") {
         const initRes = await fetch("/api/payments/sslcommerz/init", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId: data.id }),
+          body: JSON.stringify({
+            orderId: data.id,
+            paymentMethod,
+          }),
         });
         const initData = await initRes.json();
         if (!initRes.ok) {
@@ -173,9 +250,11 @@ export default function CheckoutPage() {
         return;
       }
 
-      await clearCart();
       toast.success("Order placed successfully!");
-      router.push(`/orders/${data.id}?placed=1`);
+      window.location.assign(`/orders/${data.id}?placed=1`);
+      setTimeout(() => {
+        void clearCart();
+      }, 0);
     } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -204,6 +283,41 @@ export default function CheckoutPage() {
         <div className="lg:col-span-2 space-y-6">
           <section className="border rounded-lg p-6 space-y-4">
             <h2 className="text-xl font-bold">Shipping Address</h2>
+            {savedAddresses.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase text-muted-foreground">
+                  Saved addresses
+                </p>
+                {savedAddresses.map((addr) => (
+                  <button
+                    key={addr.id}
+                    type="button"
+                    onClick={() => applyAddress(addr)}
+                    className={`w-full flex items-start gap-3 border rounded-lg p-3 text-left transition ${
+                      selectedAddressId === addr.id
+                        ? "border-primary bg-primary/5"
+                        : "hover:bg-muted/50"
+                    }`}
+                  >
+                    <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">
+                        {addr.name} — {addr.phone}
+                        {addr.isDefault && (
+                          <span className="ml-2 text-xs text-primary">
+                            Default
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {addr.address}, {addr.city}, {addr.district}
+                        {addr.zipCode ? `, ${addr.zipCode}` : ""}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="fullName">Full Name</Label>
@@ -268,11 +382,8 @@ export default function CheckoutPage() {
               {PAYMENT_METHODS.map((method) => {
                 const Icon = method.icon;
                 return (
-                  <button
+                  <label
                     key={method.id}
-                    type="button"
-                    disabled={method.disabled}
-                    onClick={() => setPaymentMethod(method.id)}
                     className={`w-full flex items-center gap-3 border rounded-lg p-4 text-left transition ${
                       paymentMethod === method.id
                         ? "border-primary bg-primary/5"
@@ -289,16 +400,28 @@ export default function CheckoutPage() {
                     <input
                       type="radio"
                       name="payment"
+                      value={method.id}
                       checked={paymentMethod === method.id}
                       onChange={() => setPaymentMethod(method.id)}
                       disabled={method.disabled}
                       className="accent-primary"
                     />
-                  </button>
+                  </label>
                 );
               })}
             </div>
           </section>
+
+          {emiAvailable && (
+            <p className="text-xs text-muted-foreground">
+              EMI available: pay {formatMoney(emiInstallment)}/month for{" "}
+              {settings.emiMonths} months
+              {settings.emiInterestRate > 0
+                ? ` at ${settings.emiInterestRate}% annual interest`
+                : " at 0% interest"}{" "}
+              via SSLCommerz card payments.
+            </p>
+          )}
         </div>
 
         <div className="border rounded-lg p-6 h-fit space-y-4">
@@ -306,10 +429,13 @@ export default function CheckoutPage() {
 
           <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
             {cartItems.map((item) => (
-              <div key={item.id} className="flex items-center gap-3">
+              <div
+                key={`${item.id}::${item.variant?.id ?? ""}`}
+                className="flex items-center gap-3"
+              >
                 <div className="relative">
                   <Image
-                    src={item.image}
+                    src={item.variant?.image ?? item.image}
                     alt={item.title}
                     width={48}
                     height={48}
@@ -319,9 +445,18 @@ export default function CheckoutPage() {
                     {item.quantity}
                   </span>
                 </div>
-                <p className="flex-1 text-sm line-clamp-1">{item.title}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm line-clamp-1">{item.title}</p>
+                  {item.variant && (
+                    <p className="text-xs text-muted-foreground">
+                      {item.variant.name}
+                    </p>
+                  )}
+                </div>
                 <span className="text-sm font-medium">
-                  ${(item.price * item.quantity).toFixed(2)}
+                  {formatMoney(
+                    (item.variant?.price ?? item.price) * item.quantity,
+                  )}
                 </span>
               </div>
             ))}
@@ -331,18 +466,18 @@ export default function CheckoutPage() {
 
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
-            <span>${cartTotal.toFixed(2)}</span>
+            <span>{formatMoney(cartTotal)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Shipping</span>
             <span className={shipping === 0 ? "text-green-600" : ""}>
-              {shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}
+              {shipping === 0 ? "Free" : formatMoney(shipping)}
             </span>
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Discount</span>
-              <span className="text-green-600">-${discount.toFixed(2)}</span>
+              <span className="text-green-600">-{formatMoney(discount)}</span>
             </div>
           )}
 
@@ -376,7 +511,7 @@ export default function CheckoutPage() {
                 Coupon &quot;{appliedCoupon.code}&quot; applied
                 {appliedCoupon.freeShipping
                   ? " — free shipping"
-                  : ` — $${appliedCoupon.discountAmount.toFixed(2)} off`}
+                  : ` — ${formatMoney(appliedCoupon.discountAmount)} off`}
               </span>
               <button
                 type="button"
@@ -394,18 +529,21 @@ export default function CheckoutPage() {
             <p className="text-xs text-red-500">{couponError}</p>
           )}
 
-          {cartTotal < FREE_SHIPPING_THRESHOLD && shipping > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Add ${(FREE_SHIPPING_THRESHOLD - cartTotal).toFixed(2)} more for
-              free shipping!
-            </p>
-          )}
+          {cartTotal < settings.freeShippingThreshold &&
+            shipping > 0 &&
+            isInsideDhaka(form.district) && (
+              <p className="text-xs text-muted-foreground">
+                Add{" "}
+                {formatMoney(settings.freeShippingThreshold - cartTotal)} more for
+                free shipping!
+              </p>
+            )}
 
           <Separator />
 
           <div className="flex justify-between font-bold text-lg">
             <span>Total</span>
-            <span>${total.toFixed(2)}</span>
+            <span>{formatMoney(total)}</span>
           </div>
 
           <Button

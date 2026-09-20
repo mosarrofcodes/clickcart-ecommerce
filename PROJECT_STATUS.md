@@ -1,6 +1,6 @@
 # ClickCart — Project Status
 
-**Last updated:** Sep 17, 2026
+**Last updated:** Sep 18, 2026
 
 ## Overall Progress
 
@@ -334,6 +334,9 @@
 - `__tests__/api/orders.test.ts` — `POST /api/orders` validation (auth, payment method, address/phone, empty cart, insufficient stock) + success with mocked db/notifications
 - `__tests__/api/order-status.test.ts` — `PUT /api/orders/[id]/status` admin gate, invalid transitions, notification triggers
 - `__tests__/api/reviews.test.ts` — `POST /api/reviews` auth, validation, product-not-found, upsert + recompute
+- `__tests__/api/track.test.ts` — `POST /api/track` required fields, 404, `+880` phone normalization + status label
+- `__tests__/api/reports-export.test.ts` — `GET /api/admin/reports/export` admin gate, unknown type, orders/products CSV + quoting/escaping
+- `__tests__/api/newsletter.test.ts` — `POST /api/newsletter` invalid email + normalized upsert
 - All API tests use `/** @jest-environment node */` (Node provides `Request`/`Response`; jsdom does not)
 
 ### Unit 12.2: Component Tests ✅
@@ -342,6 +345,7 @@
 - `__tests__/components/AddToCartButton.test.tsx` — add-to-cart click, out-of-stock disabled
 - `__tests__/components/StarRating.test.tsx` — aria-label, star count
 - `__tests__/components/Pagination.test.tsx` — empty for 1 page, page numbers, dual ellipsis for many pages, onPageChange callbacks
+- `__tests__/components/Button.test.tsx` — `asChild` renders a real link (no `<button>` wrapper) and merges classes
 - Mocks: `next/image`, `sonner`, `@/store/cart`, `@/store/wishlist`, `@/components/product/WishlistButton`
 
 ### Unit 12.3: E2E Specs ✅
@@ -351,6 +355,68 @@
 - `e2e/checkout.spec.ts` — sign in → add product → cart → checkout → COD order → redirects to order detail
 - `e2e/admin.spec.ts` — sign in → navigate to `/admin` → Dashboard heading visible
 - Note: `npx playwright install chromium` required before first run; DB must be seeded (`npm run db:seed`)
+
+## Production Hardening (Post-Phase 14)
+
+Business-facing features added on top of the 14 phases to make the storefit for a real Bangladeshi business.
+
+### Shipping & Site Settings ✅
+
+- `SiteSetting` key/value table + `src/lib/site-settings.ts` (30s in-memory cache; `getSiteSettings()` + `computeShipping()` + `isInsideDhaka()` + EMI helpers `computeEmi()`/`emiForAmount()`)
+- `Order.subtotal` / `Order.shipping` / `Order.district` persisted so historical orders keep their original shipping rules
+- Public `GET /api/settings`; admin `GET/PUT /api/admin/settings`; `/admin/settings` page + `AdminSettings.tsx` (shipping inside/outside Dhaka, free-shipping threshold, EMI months + interest)
+- Checkout computes shipping from district; `.env.example` documents all settings
+
+### Order Lifecycle & Auto-Cancel ✅
+
+- `src/lib/order-lifecycle.ts` — `cancelStalePendingOrders()` cancels unpaid PENDING/CONFIRMED orders older than `AUTO_CANCEL_PENDING_HOURS` and restores stock
+- `GET /api/cron/cancel-stale-pending` guarded by `Authorization: Bearer ${CRON_SECRET}`; `vercel.json` cron schedule
+- Customer invoice print + order summary + delivery estimate UI
+
+### Product Variants ✅
+
+- `ProductVariant` model (name, price, stock, sku); `CartItem.variantId` + `lineKey` (`productId` or `productId::variantId`, `@@unique([cartId,lineKey])` to avoid Postgres NULL-uniqueness pitfalls); `OrderItem.variantId`/`variantName` snapshots
+- Variant-aware cart: `cart-service.ts`, `/api/cart/items` (+`?variantId=`), `src/store/cart.ts` (`addItem/removeItem/updateQuantity` take an optional variant), `ProductVariantPicker.tsx`
+- Orders decrement/restore the selected variant's stock; notification titles include variant name
+- Admin `ProductForm.tsx` variant editor + `oldPrice`; `/api/products` POST + `/api/products/[id]` PUT sync variants
+
+### Catalog: Deals, Brands, EMI ✅
+
+- `Product.oldPrice` → discount badge + strikethrough on `ProductCard`
+- `/offers` deals page (discounted products) and `/brands` page (all brands); Navbar/Footer links
+
+### Trust & Info Pages + Order Tracking ✅
+
+- Reusable `src/components/layout/InfoPage.tsx` (`InfoSection`, `infoPageMetadata`)
+- Pages: `/about`, `/contact` (+ `ContactForm` + `POST /api/contact`), `/shipping-policy`, `/return`, `/payment-methods`, `/faq`, `/terms`, `/privacy`
+- `/track` — public order tracking (`POST /api/track` with `{ orderId, phone }`; normalizes `+880…` phone; returns status timeline, 404 on mismatch)
+
+### Admin Reports & CSV Export ✅
+
+- `/admin/reports` — 30-day revenue, order count, avg order value, items sold, store-wide totals, order-status breakdown, top-selling products, low stock
+- `GET /api/admin/reports/export?type=orders|products|customers` — admin-only CSV download (RFC-style quoting/escaping)
+- Reports nav item added to `AdminSidebar`
+
+### Google OAuth ✅
+
+- Optional Google provider in `src/lib/auth.ts` (auto-enabled when `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set), `allowDangerousEmailAccountLinking`, `signIn` callback blocks blocked users, JWT backfills `role` for OAuth sessions
+- `GoogleSignInButton.tsx` — self-configuring (reads `/api/auth/providers`, renders only when Google is enabled); shown on sign-in + sign-up
+- `.env.example` documents `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and the redirect URI
+
+### Storefront Realism & Correctness (Sep 18) ✅
+
+- **Button `asChild` implemented** (`src/components/ui/button.tsx` via `cloneElement`) — previously `asChild` was declared but ignored, so ~18 usages rendered invalid `<button><a>` nesting. Now they render a real `<a>` with button styles. Remaining `Button><Link` cases in `Navbar`, `categories/[slug]`, `not-found` converted to `asChild`.
+- **Navbar rebuilt**: announcement bar (free delivery + hotline + Track Order), `Contact` link, `CategoryMenu` hover dropdown (fetches `/api/categories`), valid link markup throughout, mobile menu hotline.
+- **Footer rebuilt**: trust strip (fast delivery / secure payments / easy returns), contact block (address/phone/email), payment badges (COD, bKash, Nagad, Rocket, Visa, Mastercard), newsletter form, social links.
+- **Newsletter**: `NewsletterSubscriber` model (db-pushed); `POST /api/newsletter` (email validation + upsert); `NewsletterForm.tsx`.
+- **Homepage rebuilt**: gradient hero with CTAs, trust badge row, category tiles, "Today's Deals" (oldPrice products), Featured Products.
+- **Product detail**: visual breadcrumb, discount/save display from `oldPrice`, "You may also like" related products by category.
+- **Checkout**: payment-method rows changed from `<button>` wrapping a radio (invalid) to `<label>` + radio.
+- **Site config**: `src/lib/site.ts` gained `SITE_PHONE`/`SITE_EMAIL`/`SITE_ADDRESS`/`SITE_SOCIAL` (env-overridable, documented in `.env.example`).
+
+### Bug Fix ✅
+
+- `notifyOrderPlaced` was passed a malformed payload (missing `product`) so order-confirmation emails silently failed — fixed by passing the correct `OrderWithItems` shape; `OrderWithItems.items` now carries resolved `title` + optional `variantName`
 
 ## Phase 14: Deployment ⏳
 
@@ -365,7 +431,7 @@
 
 ### Unit 14.2: Deployment ⚠️ (in progress)
 
-- [x] CI/CD — `.github/workflows/ci.yml` (lint + typecheck + 91 tests on push/PR) and `.github/workflows/deploy.yml` (Vercel `--prod` on push to `main`, uses `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` repo secrets)
+- [x] CI/CD — `.github/workflows/ci.yml` (lint + typecheck + tests on push/PR) and `.github/workflows/deploy.yml` (Vercel `--prod` on push to `main`, uses `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` repo secrets)
 - [x] Auth production fix — added `AUTH_TRUST_HOST=true` (Auth.js v5 requires it on Vercel/hosted); smoke-tested under `next start`: `/api/auth/session` + `/api/auth/providers` now return 200 (were 500)
 - [x] `middleware.ts` → `proxy.ts` rename (Next 16 deprecation removed; matcher also excludes sitemap/robots/og-image routes); verified in build route table + redirect guard on `/checkout`
 - [ ] **Needs user:** `git push origin main` (first deploy), add repo secrets, run Vercel deployment
@@ -374,12 +440,52 @@
 
 ## Current Active Task
 
-- **Phase 14:** Deployment — code/config done (60%); remaining steps need Vercel/Neon/GitHub account access (env vars, push, domain)
+- **Phase 14:** Deployment — code/config done; production-hardening features (settings/shipping, order lifecycle, variants, catalog, trust pages, tracking, reports, Google OAuth) complete. Real-storefront feature pass complete (see below). Remaining steps need Vercel/Neon/GitHub account access (env vars, commit + push, domain).
 
 ## Recent Changes
 
+- **Bug fix (Sep 21): client pages crashing with `PrismaClient is unable to run in this browser environment`.** Root cause: client components imported pure helpers from server-only modules (`src/lib/cart-service.ts`, `site-settings.ts`, `product-query.ts`, `coupon-service.ts`) that `import { db }` from `@/lib/db`, bundling PrismaClient into the browser — broke `/products` filters, cart page, checkout, `/admin/coupons`. Fix: moved all db-free helpers (shipping calc, EMI, site defaults, product sorts, coupon labels) into a new pure `src/lib/store-config.ts`; the db modules now re-export from it; client files import from `store-config`. Added `import "server-only"` to `src/lib/db.ts` (+ `jest.server-only.js` stub + `jest.config.mjs` moduleNameMapper) so any future client→db leak fails the build instead of crashing at runtime. Verified: lint clean, `tsc --noEmit` clean, 106 tests / 19 suites pass, production build passes.
+
+- **Real-storefront feature pass (Sep 18):** all 9 requested shopping-site UX features built —
+  - **Product card upgrades:** rating stars + review count (`_count.reviews`), variant "From ৳X" price (variants ordered by price in all card queries), "Only X left" urgency when stock ≤ 5; `Product.reviewCount` → `Product._count.reviews` type
+  - **Quick view:** eye button on card hover opens a `Dialog` (variant picker, price/stock, add-to-cart, view-details)
+  - **Cart drawer:** new `src/components/ui/drawer.tsx` (slide-over primitive) + `CartDrawer.tsx` (line items, qty −/+, move-to-wishlist, subtotal, checkout); navbar Cart button now opens the drawer (`useUIStore.openCartDrawer`/`setCartDrawerOpen` added) and every add-to-cart opens it
+  - **Recently viewed:** `src/store/recentlyViewed.ts` (persisted, max 8); `RecordProductView` on the product page; "Recently Viewed" section on home
+  - **Mobile sticky buy bar:** `ProductBuySection` shares variant state with `ProductVariantPicker` (now controlled-mode) and renders a fixed bottom bar (price + add-to-cart) on `<md`; page adds mobile bottom padding; `FloatingSupport` shifts up on product pages
+  - **WhatsApp / hotline floating button:** `FloatingSupport.tsx` in root layout — `wa.me/<digits>` WhatsApp bubble + `tel:` hotline chip + scroll-to-top
+  - **Address prefill at checkout:** loads `/api/user/addresses`, auto-fills default, clickable saved-address cards
+  - **Home banners + category images:** `PromoBanner` auto-rotating 3-slide carousel (flash sale / COD / free delivery); category tiles show `category.image` with gradient-initial fallback
+  - **Dark mode:** `next-themes` `ThemeProvider` (attribute="class", system default) in root layout; `ThemeToggle` in Navbar (`useSyncExternalStore` isClient guard — no setState-in-effect); existing `.dark` tokens used; removed hardcoded `bg-orange-50` from Navbar/Footer (now `bg-background` / `bg-muted/50`)
+  - **Invoice PDF:** PrintButton + print CSS already existed; added a print-only branded invoice header (ClickCart, address/phone/email, invoice #, date, status) to `/orders/[id]` and `.print-only` CSS
+  - **UI polish:** free-delivery progress bar on cart page; verified dark-mode-safe colors
+  - Verified: `eslint` clean, `tsc --noEmit` clean, **103 tests / 18 suites pass** (1 test updated for new `addItem(product, 1, undefined)` signature), production build passes (71 static pages)
+
+- **Storefront realism pass (Sep 18):** real-life storefront polish —
+  - Implemented `<Button asChild>` (was declared but broken → invalid `<button><a>` nesting across ~18 usages); converted remaining Button-wrapping-Link cases in Navbar/categories/[slug]/not-found
+  - Navbar: announcement bar (hotline, Track Order, free delivery), Contact nav item, category hover dropdown, valid link markup, mobile hotline
+  - Footer: trust strip, contact block, payment badges (COD/bKash/Nagad/Rocket/Visa/Mastercard), newsletter signup, social links
+  - Newsletter backend: `NewsletterSubscriber` model (db-pushed) + `POST /api/newsletter`
+  - Homepage: hero with CTAs, trust badges, category tiles, Today's Deals, Featured Products
+  - Product detail: breadcrumbs, old-price discount display, related products
+  - Checkout: fixed `<button>`-wrapping-radio markup → `<label>`
+  - `src/lib/site.ts` contact/social constants (env-overridable); `.env.example` updated
+  - Verified: lint clean, `tsc --noEmit` clean, **103 tests / 18 suites pass** (added newsletter + Button tests), production build passes (71 static pages)
+
+- **Production hardening (Sep 18):** business features on top of the 14 phases —
+  - Shipping & `SiteSetting`: district-aware `computeShipping`, admin settings page/API, EMI helpers
+  - Order lifecycle: `cancelStalePendingOrders()` + `CRON_SECRET`-guarded `/api/cron/cancel-stale-pending` + `vercel.json` cron
+  - Product variants end-to-end (schema, variant-aware cart/orders/stock, picker, admin editor)
+  - Catalog: `Product.oldPrice`, `/offers` deals page, `/brands` page, EMI info
+  - Trust pages: `/about`, `/contact` (+ API), `/shipping-policy`, `/return`, `/payment-methods`, `/faq`, `/terms`, `/privacy`; public order tracking `/track` + `/api/track`
+  - Admin `/admin/reports` + CSV export (`orders`/`products`/`customers`)
+  - Optional Google OAuth (auto-enabled by env, self-configuring button on sign-in/up)
+  - Fixed `notifyOrderPlaced` malformed payload that silently broke confirmation emails
+  - Verified: lint clean, `tsc --noEmit` clean, **103 tests / 18 suites pass**, production build passes
+
+- **Fix (Phase 5): SSLCommerz payment was failing with an error at checkout.** Root cause: the app was calling the expired `gwprocess/v4/process.php` endpoint (SSLCommerz returns "API Expired"), and `.env` was missing `SSLCOMMERZ_STORE_ID`/`SSLCOMMERZ_STORE_PASSWD`/`SSLCOMMERZ_IS_LIVE`/`NEXT_PUBLIC_APP_URL`. Fixed in `src/lib/sslcommerz.ts` (init → `gwprocess/v4/api.php`, validation → `validationserverAPI.php`) and added the sandbox env vars to `.env`. Sandbox session init confirmed working via curl with the exact payload the app sends — returns `SUCCESS` + `GatewayPageURL` (bKash and card).
+- **Fix (Phase 11): Notifications verified.** DB check shows in-app notifications ARE created on order placement (4 `order`-type notifications present); no `payment` notifications existed only because no payment had ever completed. Payment/shipped/delivered notifications fire on successful payment and admin status updates.
 - **Phase 14 (deployment readiness) complete:** `.env.example` + `AUTH_TRUST_HOST` (fixes `/api/auth` 500 under `next start` — verified: session/providers return 200), `middleware.ts` → `proxy.ts` (deprecation warning gone, proxy guard verified via `/checkout`→signin redirect), Prisma `binaryTargets` for Vercel Lambda, `vercel.json` (prisma generate + build), GitHub Actions CI + Vercel deploy workflows, `.gitignore` un-ignored `.env.example`
-- Verified: prisma generate (native+rhel+musl targets), typegen, lint, `tsc --noEmit`, 91 tests (14 suites), production build (Turbopack), and a live `next start` smoke test (home 200, session/providers 200, sitemap 200, `/checkout` 307 → signin)
+- Verified: prisma generate (native+rhel+musl targets), typegen, lint, `tsc --noEmit`, 99 tests (16 suites), production build (Turbopack), and a live `next start` smoke test (home 200, session/providers 200, sitemap 200, `/checkout` 307 → signin)
 - Performance: ISR on public pages — `/`, `/categories`, `/categories/[slug]` now `revalidate = 3600` (`generateStaticParams` for category slugs); `/products` + `/search` stay dynamic (searchParams-driven); `/product/[id]` stays dynamic (auth/session)
 - Image optimization: `ProductCard` gained an optional `priority` prop (`loading="lazy"` default, `eager` + `priority` for LCP); home `ProductList` marks the first card image with `priority`; product detail image already `priority` + `sizes`
 - Lazy loading: home `<ProductList>` wrapped in `<Suspense>` with a skeleton grid fallback (streaming)
@@ -391,7 +497,7 @@
 - Generated social images: `src/app/opengraph-image.tsx` + `twitter-image.tsx` (ImageResponse 1200×630 brand card, statically optimized at build)
 - `src/app/sitemap.ts` (DB-backed: static routes + all category slugs + all products, `revalidate = 3600`) and `src/app/robots.ts` (allow all, disallow `/admin/` + `/api/`, sitemap link)
 - Per-page metadata: Home (title + description + OG/canonical), Products (description + OG/canonical), Search (noindex), Categories (description + OG/canonical), Category detail (`generateMetadata` with description + canonical + OG), Product detail (`generateMetadata` with og:image = product image, canonical, Twitter, Product + BreadcrumbList JSON-LD)
-- Verified: 91 tests pass (14 suites), lint clean, `tsc --noEmit` clean (after `next typegen`), production build passes (webpack + Turbopack). Route map: `/`, `/categories`, `/categories/[slug]`, `/sitemap.xml` now ISR (1h revalidate)
+- Verified: 99 tests pass (16 suites), lint clean, `tsc --noEmit` clean (after `next typegen`), production build passes (webpack + Turbopack). Route map: `/`, `/categories`, `/categories/[slug]`, `/sitemap.xml` now ISR (1h revalidate)
 - **Phase 10 complete:** Server-side coupon system
 - Coupon/CouponUse models (db-pushed); `coupon-service.ts` (calculateCouponDiscount + findValidCoupon with full validation)
 - Coupon APIs: GET/POST `/api/coupons`, PUT/DELETE `/api/coupons/[id]`, POST `/api/coupons/validate` (server-side cart subtotal validation)
@@ -445,9 +551,11 @@
 - `@next/bundle-analyzer` only works with webpack — Next 16 defaults to Turbopack, so run `set ANALYZE=true&& npx next build --webpack` to regenerate `.next/analyze/` reports
 - `npm audit` reports vulnerabilities (dev tooling related, non-blocking)
 - Neon free tier cold-starts connections (~2–7s per first query) — interactive Prisma transactions can time out if the compute is asleep; array transactions avoid this
-- SSLCommerz requires internet access to sandbox/live gateway — init/verify calls will fail without connectivity or when `SSLCOMMERZ_STORE_ID`/`SSLCOMMERZ_STORE_PASSWD` are unset (returns 500 with logging)
-- SSLCommerz flows are not yet smoke-tested end-to-end against the live sandbox (needs live store credentials + running dev server); IPN trusts gateway `status` + amount match
+- SSLCommerz requires internet access to sandbox/live gateway — init/verify calls will fail without connectivity or when `SSLCOMMERZ_STORE_ID`/`SSLCOMMERZ_STORE_PASSWD` are unset (returns 500 with logging); sandbox creds now present in `.env`
+- SSLCommerz sandbox init was broken — the v3 `gwprocess/v4/process.php` endpoint is expired (returns "API Expired"); fixed by migrating to `gwprocess/v4/api.php` (+ `validationserverAPI.php`). Sandbox session init verified via the app's exact payload → returns `SUCCESS` + `GatewayPageURL` for both card and `payment_method=bkash`. Full success callback (sandbox test payment → `/api/payments/sslcommerz/success`) still needs one manual sandbox payment; IPN trusts gateway `status` + amount match
 - Playwright E2E specs written but not yet run — requires `npx playwright install chromium` + running dev/build server + seeded DB
+- Google sign-in is hidden unless `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set (and the Google Cloud console redirect URI `…/api/auth/callback/google` is registered)
+- SSLCommerz live payments untested until `.env` switches from sandbox (`SSLCOMMERZ_IS_LIVE=false`, `testbox`) to live credentials
 
 ## Next Steps
 

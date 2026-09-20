@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, withDbRetry } from "@/lib/db";
 import { requireUser } from "@/lib/api";
 import { getOrCreateCart, computeShipping } from "@/lib/cart-service";
 import { findValidCoupon } from "@/lib/coupon-service";
+import { getSiteSettings } from "@/lib/site-settings";
 import {
   notifyOrderPlaced,
+  notifyAdminsNewOrder,
   lowStockAlerts,
 } from "@/lib/notification";
 
 const ALLOWED_PAYMENT_METHODS = new Set([
   "cash_on_delivery",
   "sslcommerz",
+  "bkash",
 ]);
 
 export async function GET() {
@@ -58,10 +61,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { address, phone, paymentMethod, couponCode } = body;
+  const { address, city, district, phone, paymentMethod, couponCode } = body;
 
   if (typeof address !== "string" || !address.trim()) {
     return NextResponse.json({ error: "Shipping address is required" }, { status: 400 });
+  }
+  if (typeof city !== "string" || !city.trim()) {
+    return NextResponse.json({ error: "City is required" }, { status: 400 });
   }
   if (typeof phone !== "string" || !phone.trim()) {
     return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
@@ -75,6 +81,12 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  if (
+    typeof district !== "string" ||
+    !district.trim()
+  ) {
+    return NextResponse.json({ error: "District is required" }, { status: 400 });
+  }
 
   try {
     const cart = getOrCreateCart(userId as string);
@@ -85,7 +97,11 @@ export async function POST(req: Request) {
     }
 
     const totalIssued = hydrated.items
-      .reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      .reduce(
+        (sum, item) =>
+          sum + (item.variant ? item.variant.price : item.product.price) * item.quantity,
+        0,
+      );
     const subtotal = Number(totalIssued.toFixed(2));
 
     let discountAmount = 0;
@@ -105,15 +121,30 @@ export async function POST(req: Request) {
       freeShipping = result.discount.freeShipping;
     }
 
-    const shipping = freeShipping ? 0 : computeShipping(subtotal);
+    const settings = await getSiteSettings();
+    const shipping = freeShipping
+      ? 0
+      : computeShipping(subtotal, {
+          district: district.trim(),
+          insideDhaka: settings.shippingInsideDhaka,
+          outsideDhaka: settings.shippingOutsideDhaka,
+          threshold: settings.freeShippingThreshold,
+        });
     const total = Number((subtotal + shipping - discountAmount).toFixed(2));
 
     const products = await db.product.findMany({
       where: { id: { in: hydrated.items.map((item) => item.productId) } },
+      include: { variants: true },
     });
     const stockMap = new Map(products.map((p) => [p.id, p.stock]));
+    const variantStocks = new Map(
+      products.flatMap((p) => p.variants.map((v) => [v.id, v.stock] as const)),
+    );
     for (const item of hydrated.items) {
-      if ((stockMap.get(item.productId) ?? 0) < item.quantity) {
+      const available = item.variantId
+        ? variantStocks.get(item.variantId) ?? 0
+        : (stockMap.get(item.productId) ?? 0);
+      if (available < item.quantity) {
         return NextResponse.json(
           { error: `Insufficient stock for ${item.product.title}` },
           { status: 400 },
@@ -121,21 +152,28 @@ export async function POST(req: Request) {
       }
     }
 
-    const created = await db.$transaction([
-      db.order.create({
+const created = await withDbRetry(() =>
+      db.$transaction([
+        db.order.create({
         data: {
           userId: userId as string,
           status: "PENDING",
           address: address.trim(),
+          city: city.trim(),
+          district: district.trim(),
           phone: phone.trim(),
+          subtotal,
+          shipping,
           total,
           couponId,
           discount: discountAmount,
           items: {
             create: hydrated.items.map((item) => ({
               productId: item.productId,
+              variantId: item.variantId ?? null,
+              variantName: item.variant?.name ?? null,
               quantity: item.quantity,
-              price: item.product.price,
+              price: item.variant ? item.variant.price : item.product.price,
             })),
           },
           payment: {
@@ -149,10 +187,15 @@ export async function POST(req: Request) {
         },
       }),
       ...hydrated.items.map((item) =>
-        db.product.updateMany({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
-        }),
+        item.variantId
+          ? db.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: { decrement: item.quantity } },
+            })
+          : db.product.update({
+              where: { id: item.productId },
+              data: { stock: { decrement: item.quantity } },
+            }),
       ),
       ...(couponId
         ? [
@@ -166,21 +209,31 @@ export async function POST(req: Request) {
           ]
         : []),
       db.cartItem.deleteMany({ where: { cartId: hydrated.id } }),
-    ]);
+    ])
+    );
 
     const { user, ...orderData } = created[0];
 
     void notifyOrderPlaced({
       id: orderData.id,
       total: orderData.total,
+      subtotal: orderData.subtotal,
+      shipping: orderData.shipping,
+      discount: orderData.discount,
       address: orderData.address,
       phone: orderData.phone,
       items: orderData.items.map((i) => ({
         quantity: i.quantity,
         price: i.price,
-        title: i.product.title,
+        title: i.variantName
+          ? `${i.product.title} (${i.variantName})`
+          : i.product.title,
       })),
       user,
+    });
+    void notifyAdminsNewOrder({
+      id: orderData.id,
+      total: orderData.total,
     });
     void lowStockAlerts();
 

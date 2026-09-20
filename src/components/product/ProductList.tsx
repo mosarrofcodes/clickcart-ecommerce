@@ -7,7 +7,11 @@ interface ProductListProps {
 
 export default async function ProductList({ limit = 12 }: ProductListProps) {
   const products = await db.product.findMany({
-    include: { category: true },
+    include: {
+      category: true,
+      _count: { select: { reviews: true } },
+      variants: { orderBy: { price: "asc" } },
+    },
     orderBy: { createdAt: "desc" },
     take: limit,
   });

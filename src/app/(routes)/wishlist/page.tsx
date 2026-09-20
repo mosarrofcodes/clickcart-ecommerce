@@ -9,6 +9,7 @@ import { useCartStore } from "@/store/cart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import { formatMoney } from "@/lib/currency";
 
 export default function WishlistPage() {
   useEffect(() => {
@@ -79,7 +80,7 @@ export default function WishlistPage() {
                   {product.title}
                 </h2>
               </Link>
-              <p className="text-primary font-bold">${product.price}</p>
+              <p className="text-primary font-bold">{formatMoney(product.price)}</p>
               <div className="flex gap-2">
                 <Button
                   size="sm"

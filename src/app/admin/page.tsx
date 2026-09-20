@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { STATUS_COLORS, type OrderStatus } from "@/lib/order-status";
+import { formatMoney } from "@/lib/currency";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function AdminDashboardPage() {
     ]);
 
   const stats = [
-    { label: "Total Sales", value: `$${Number(salesAgg._sum.total ?? 0).toFixed(2)}`, icon: DollarSign },
+    { label: "Total Sales", value: formatMoney(Number(salesAgg._sum.total ?? 0)), icon: DollarSign },
     { label: "Orders", value: orderAgg, icon: ShoppingBag },
     { label: "Customers", value: userCount, icon: Users },
     { label: "Products", value: productCount, icon: Package },
@@ -128,7 +129,7 @@ export default async function AdminDashboardPage() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {o.user.name} — ${o.total.toFixed(2)}
+                        {o.user.name} — {formatMoney(o.total)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(o.createdAt).toLocaleDateString()}
@@ -184,7 +185,7 @@ function RevenueChart({ data }: { data: { day: string; total: number }[] }) {
             <div
               className="w-full rounded-t bg-primary/80 hover:bg-primary transition-colors"
               style={{ height: `${Math.max((d.total / max) * 100, d.total > 0 ? 4 : 1)}%` }}
-              title={`$${d.total.toFixed(2)}`}
+              title={`${formatMoney(d.total)}`}
             />
           </div>
         ))}

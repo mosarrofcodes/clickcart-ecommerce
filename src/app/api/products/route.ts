@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     title,
     description,
     price,
+    oldPrice = null,
     stock = 0,
     image,
     brand = null,
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
     weight = null,
     tags = [],
     categoryId,
+    variants = [],
   } = body;
 
   if (!title || !description || !image || !sku || !categoryId) {
@@ -65,6 +67,8 @@ export async function POST(req: Request) {
         title: String(title),
         description: String(description),
         price,
+        oldPrice:
+          typeof oldPrice === "number" && oldPrice > price ? oldPrice : null,
         stock: Number(stock) || 0,
         image: String(image),
         brand: brand ? String(brand) : null,
@@ -72,8 +76,27 @@ export async function POST(req: Request) {
         weight: typeof weight === "number" ? weight : null,
         tags: Array.isArray(tags) ? tags.map(String) : [],
         categoryId: String(categoryId),
+        variants: {
+          create: Array.isArray(variants)
+            ? variants
+                .filter(
+                  (v): v is { name: string; price: number; stock: number; sku?: string | null } =>
+                    Boolean(
+                      v &&
+                        typeof (v as Record<string, unknown>).name === "string" &&
+                        typeof (v as Record<string, unknown>).price === "number",
+                    ),
+                )
+                .map((v) => ({
+                  name: v.name,
+                  price: v.price,
+                  stock: Number(v.stock) || 0,
+                  sku: v.sku || null,
+                }))
+            : [],
+        },
       },
-      include: { category: true },
+      include: { category: true, variants: true },
     });
 
     return NextResponse.json(product, { status: 201 });

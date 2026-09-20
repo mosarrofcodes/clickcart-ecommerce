@@ -2,16 +2,19 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { ArrowLeft, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import AddToCartButton from "@/components/product/AddToCartButton";
+import ProductBuySection from "@/components/product/ProductBuySection";
+import ProductCard from "@/components/product/ProductCard";
+import RecordProductView from "@/components/product/RecordProductView";
+import EmiInfo from "@/components/product/EmiInfo";
 import StarRating from "@/components/product/StarRating";
 import ReviewForm from "@/components/product/ReviewForm";
 import ReviewList from "@/components/product/ReviewList";
+import { formatMoney } from "@/lib/currency";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -57,6 +60,7 @@ export default async function ProductDetailsPage({ params }: PageProps) {
     where: { id },
     include: {
       category: true,
+      variants: { orderBy: { price: "asc" } },
       reviews: {
         include: {
           user: { select: { id: true, name: true, image: true } },
@@ -70,10 +74,28 @@ export default async function ProductDetailsPage({ params }: PageProps) {
     notFound();
   }
 
+  const related = await db.product.findMany({
+    where: { categoryId: product.categoryId, id: { not: product.id } },
+    include: {
+      category: true,
+      _count: { select: { reviews: true } },
+      variants: { orderBy: { price: "asc" } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 4,
+  });
+
   const currentUserId = session?.user?.id;
   const myReview = currentUserId
     ? product.reviews.find((r) => r.user.id === currentUserId)
     : undefined;
+  const hasVariants = product.variants.length > 0;
+  const minPrice = hasVariants
+    ? product.variants.reduce((m, v) => Math.min(m, v.price), Infinity)
+    : product.price;
+  const inStock = hasVariants
+    ? product.variants.some((v) => v.stock > 0)
+    : product.stock > 0;
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -86,13 +108,12 @@ export default async function ProductDetailsPage({ params }: PageProps) {
     offers: {
       "@type": "Offer",
       url: `/product/${product.id}`,
-      priceCurrency: "USD",
-      price: product.price,
+      priceCurrency: "BDT",
+      price: minPrice,
       itemCondition: "https://schema.org/NewCondition",
-      availability:
-        product.stock > 0
-          ? "https://schema.org/InStock"
-          : "https://schema.org/OutOfStock",
+      availability: inStock
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
     },
     aggregateRating:
       product.reviews.length > 0
@@ -131,7 +152,7 @@ export default async function ProductDetailsPage({ params }: PageProps) {
   };
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-10">
+    <main className="max-w-6xl mx-auto px-6 pt-10 pb-24 md:pb-10">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -145,12 +166,25 @@ export default async function ProductDetailsPage({ params }: PageProps) {
         }}
       />
 
-      <Button variant="ghost" className="mb-6" asChild>
-        <Link href="/">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Products
+      <nav
+        aria-label="Breadcrumb"
+        className="flex items-center gap-2 text-sm text-muted-foreground mb-6"
+      >
+        <Link href="/" className="hover:text-primary transition-colors">
+          Home
         </Link>
-      </Button>
+        <span>/</span>
+        <Link
+          href={`/categories/${product.category.slug}`}
+          className="hover:text-primary transition-colors"
+        >
+          {product.category.name}
+        </Link>
+        <span>/</span>
+        <span className="text-foreground font-medium line-clamp-1">
+          {product.title}
+        </span>
+      </nav>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
         <div className="overflow-hidden rounded-lg border">
@@ -193,30 +227,68 @@ export default async function ProductDetailsPage({ params }: PageProps) {
             {product.description}
           </p>
 
-          <p className="text-3xl font-bold text-primary">${product.price}</p>
-
-          <p
-            className={`text-sm font-medium ${product.stock > 0 ? "text-green-500" : "text-red-500"}`}
-          >
-            {product.stock > 0
-              ? `In Stock (${product.stock} left)`
-              : "Out of Stock"}
-          </p>
-
-          <div className="space-y-1 text-sm text-muted-foreground">
-            <p>
-              SKU: <span className="font-medium">{product.sku}</span>
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <p className="text-3xl font-bold text-primary">
+              {hasVariants ? `From ${formatMoney(minPrice)}` : formatMoney(product.price)}
             </p>
-            {product.weight && (
-              <p>
-                Weight: <span className="font-medium">{product.weight} kg</span>
-              </p>
+            {product.oldPrice && product.oldPrice > minPrice && (
+              <>
+                <span className="text-lg text-muted-foreground line-through">
+                  {formatMoney(product.oldPrice)}
+                </span>
+                <span className="text-sm font-semibold text-red-600">
+                  Save {formatMoney(product.oldPrice - minPrice)} (
+                  {Math.round(((product.oldPrice - minPrice) / product.oldPrice) * 100)}%)
+                </span>
+              </>
             )}
           </div>
 
-          <AddToCartButton product={product} />
+          {hasVariants ? (
+            <p className="text-sm font-medium text-muted-foreground">
+              {product.variants.length} option{product.variants.length === 1 ? "" : "s"} available
+            </p>
+          ) : (
+            <p
+              className={`text-sm font-medium ${product.stock > 0 ? "text-green-500" : "text-red-500"}`}
+            >
+              {product.stock > 0
+                ? `In Stock (${product.stock} left)`
+                : "Out of Stock"}
+            </p>
+          )}
+
+          {!hasVariants && (
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p>
+                SKU: <span className="font-medium">{product.sku}</span>
+              </p>
+              {product.weight && (
+                <p>
+                  Weight: <span className="font-medium">{product.weight} kg</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          <ProductBuySection product={product} />
+
+          <EmiInfo price={minPrice} />
         </div>
       </div>
+
+      <RecordProductView product={product} />
+
+      {related.length > 0 && (
+        <section className="mt-14" aria-label="Related products">
+          <h2 className="text-2xl font-bold mb-6">You may also like</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {related.map((item) => (
+              <ProductCard key={item.id} product={item} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-14 max-w-3xl" aria-label="Reviews">
         <h2 className="text-2xl font-bold flex items-center gap-2 mb-6">

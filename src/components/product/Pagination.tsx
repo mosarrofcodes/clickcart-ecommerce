@@ -1,4 +1,4 @@
-import { PRODUCT_SORTS, type ProductSort } from "@/lib/product-query";
+import { PRODUCT_SORTS, type ProductSort } from "@/lib/store-config";
 import { cn } from "@/lib/utils";
 
 interface PaginationProps {

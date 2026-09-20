@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { STATUS_COLORS, ORDER_STATUS_STEPS, type OrderStatus } from "@/lib/order-status";
+import { formatMoney } from "@/lib/currency";
 
 interface AdminOrder {
   id: string;
@@ -128,7 +129,7 @@ export default function AdminOrdersTable({
                     )}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{o.paymentMethod}</td>
-                  <td className="px-4 py-3 text-right font-medium">${o.total.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right font-medium">{formatMoney(o.total)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span

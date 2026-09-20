@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ChevronLeft, MapPin, Phone, CreditCard } from "lucide-react";
 import { db } from "@/lib/db";
-import { computeShipping } from "@/lib/cart-service";
+import { formatMoney } from "@/lib/currency";
 import { OrderStatusControl, PrintButton } from "@/components/admin/OrderActions";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +27,11 @@ export default async function AdminOrderDetailPage({
   if (!order) notFound();
 
   const subtotal = order.items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const shipping = computeShipping(subtotal);
-  const discount = Math.max(0, Number((subtotal + shipping - order.total).toFixed(2)));
+  const shipping =
+    order.shipping > 0
+      ? order.shipping
+      : Math.max(0, Number((order.total - subtotal + order.discount).toFixed(2)));
+  const discount = Math.max(0, order.discount);
 
   return (
     <div className="space-y-6">
@@ -72,12 +75,17 @@ export default async function AdminOrderDetailPage({
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium line-clamp-1">{item.product.title}</p>
+                      {item.variantName && (
+                        <p className="text-xs text-muted-foreground">
+                          {item.variantName}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground">
-                        ${item.price.toFixed(2)} × {item.quantity}
+                        {formatMoney(item.price)} × {item.quantity}
                       </p>
                     </div>
                     <span className="text-sm font-medium">
-                      ${(item.price * item.quantity).toFixed(2)}
+                      {formatMoney(item.price * item.quantity)}
                     </span>
                   </div>
                 ))}
@@ -134,21 +142,21 @@ export default async function AdminOrderDetailPage({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>{formatMoney(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
+                  <span>{shipping === 0 ? "Free" : formatMoney(shipping)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount</span>
-                    <span>-${discount.toFixed(2)}</span>
+                    <span>-{formatMoney(discount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between pt-2 border-t font-bold">
                   <span>Total</span>
-                  <span>${order.total.toFixed(2)}</span>
+                  <span>{formatMoney(order.total)}</span>
                 </div>
               </div>
             </section>

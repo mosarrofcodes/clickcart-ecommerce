@@ -6,7 +6,7 @@ import {
   shippingNotificationEmail,
   type OrderEmailContext,
 } from "@/lib/email-templates";
-import { computeShipping } from "@/lib/cart-service";
+import { formatMoney } from "@/lib/currency";
 
 export const NOTIFICATION_TYPES = {
   order: "order",
@@ -85,9 +85,17 @@ function allowedEmail(
 export type OrderWithItems = {
   id: string;
   total: number;
+  subtotal?: number;
+  shipping?: number;
+  discount?: number;
   address: string;
   phone: string;
-  items: { quantity: number; price: number; title: string }[];
+  items: {
+    quantity: number;
+    price: number;
+    title: string;
+    variantName?: string | null;
+  }[];
   user: { id: string; email: string; name: string | null };
 };
 
@@ -99,12 +107,16 @@ export async function loadOrderWithItemsAndUser(
     select: {
       id: true,
       total: true,
+      subtotal: true,
+      shipping: true,
+      discount: true,
       address: true,
       phone: true,
       items: {
         select: {
           quantity: true,
           price: true,
+          variantName: true,
           product: { select: { title: true } },
         },
       },
@@ -115,12 +127,15 @@ export async function loadOrderWithItemsAndUser(
   return {
     id: order.id,
     total: order.total,
+    subtotal: order.subtotal,
+    shipping: order.shipping,
+    discount: order.discount,
     address: order.address,
     phone: order.phone,
     items: order.items.map((i) => ({
       quantity: i.quantity,
       price: i.price,
-      title: i.product.title,
+      title: i.variantName ? `${i.product.title} (${i.variantName})` : i.product.title,
     })),
     user: order.user,
   };
@@ -134,8 +149,17 @@ export function orderEmailContext(order: OrderWithItems): OrderEmailContext {
   const subtotal = Number(
     order.items.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(2),
   );
-  const shipping = Number(computeShipping(subtotal).toFixed(2));
-  const discount = Math.max(0, Number((subtotal + shipping - order.total).toFixed(2)));
+  const discount = Number(order.discount ?? 0);
+  const storedShipping =
+    typeof order.shipping === "number" && order.shipping > 0
+      ? order.shipping
+      : null;
+  const shipping = Number(
+    (storedShipping ??
+      Math.max(0, Number((order.total - subtotal + discount).toFixed(2)))).toFixed(
+      2,
+    ),
+  );
   return {
     orderId: order.id,
     customerName: order.user.name ?? "Customer",
@@ -236,6 +260,33 @@ export async function notifyPaymentCompleted(
     }
   } catch (err) {
     console.error("payment receipt email error:", err);
+  }
+}
+
+/**
+ * Notifies admins (in-app) when a new order is placed.
+ */
+export async function notifyAdminsNewOrder(order: {
+  id: string;
+  total: number;
+}): Promise<void> {
+  try {
+    const admins = await db.user.findMany({
+      where: { role: "ADMIN" },
+      select: { id: true },
+    });
+    if (admins.length === 0) return;
+
+    for (const admin of admins) {
+      await createNotification(admin.id, {
+        type: NOTIFICATION_TYPES.order,
+        title: "New order",
+        body: `Order #${order.id} placed for ${formatMoney(order.total)}.`,
+        link: `/admin/orders/${order.id}`,
+      });
+    }
+  } catch (err) {
+    console.error("notifyAdminsNewOrder error:", err);
   }
 }
 

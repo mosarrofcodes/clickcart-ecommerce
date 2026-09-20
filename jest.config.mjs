@@ -9,6 +9,7 @@ const config = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
+    "^server-only$": "<rootDir>/jest.server-only.js",
   },
   testPathIgnorePatterns: ["/node_modules/", "/.next/", "/e2e/"],
   clearMocks: true,

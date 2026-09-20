@@ -11,11 +11,16 @@ test("place a cash-on-delivery order", async ({ page }) => {
   const addToCart = page.getByRole("button", { name: /add to cart/i }).first();
   await expect(addToCart).toBeVisible();
   await addToCart.click();
+  await expect(
+    page.getByRole("button", { name: /Cart/i }).first(),
+  ).toContainText("1");
 
   await page.goto("/cart");
-  await expect(page.getByText("Proceed to Checkout")).toBeVisible();
-
-  await page.getByRole("link", { name: "Proceed to Checkout" }).click();
+  const checkoutLink = page
+    .locator("main")
+    .getByRole("link", { name: "Proceed to Checkout" });
+  await expect(checkoutLink).toBeVisible();
+  await checkoutLink.click();
   await expect(page).toHaveURL("/checkout");
 
   await page.getByLabel("Full Name").fill("E2E Shopper");

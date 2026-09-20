@@ -11,7 +11,10 @@ export default async function EditProductPage({
 }) {
   const { id } = await params;
   const [product, categories] = await Promise.all([
-    db.product.findUnique({ where: { id } }),
+    db.product.findUnique({
+      where: { id },
+      include: { variants: true },
+    }),
     db.category.findMany({ orderBy: { name: "asc" } }),
   ]);
 
@@ -36,6 +39,7 @@ export default async function EditProductPage({
           tags: product.tags,
           image: product.image,
           categoryId: product.categoryId,
+          variants: product.variants,
         }}
         categories={categories}
       />

@@ -162,7 +162,7 @@ describe("findValidCoupon", () => {
       minOrder: 50,
     });
     const result = await findValidCoupon("SAVE10", "user-1", 20);
-    expect(result).toMatchObject({ coupon: null, error: expect.stringMatching(/Minimum order of \$50\.00 required/) });
+    expect(result).toMatchObject({ coupon: null, error: expect.stringMatching(/Minimum order of ৳50\.00 required/) });
   });
 
   it("returns the coupon and computed discount when valid", async () => {

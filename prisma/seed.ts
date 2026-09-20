@@ -7,7 +7,18 @@ async function main() {
   console.log("Seeding database...\n");
 
   // ==================== ADMIN USER ====================
-  const adminPassword = await hash("admin123", 12);
+  // Password comes from ADMIN_SEED_PASSWORD. The fallback is a placeholder
+  // that must be changed before seeding a production database — never ship
+  // a real admin with a known password.
+  const adminPassword = await hash(
+    process.env.ADMIN_SEED_PASSWORD ?? "changeMeOnFirstRun_9f3K!",
+    12,
+  );
+  if (!process.env.ADMIN_SEED_PASSWORD) {
+    console.warn(
+      "WARNING: ADMIN_SEED_PASSWORD is not set. The seeded admin uses the insecure fallback password - set it before seeding production.",
+    );
+  }
   const admin = await prisma.user.upsert({
     where: { email: "admin@clickcart.com" },
     update: {},
@@ -27,37 +38,37 @@ async function main() {
       name: "Electronics",
       slug: "electronics",
       description: "Gadgets, devices, and tech accessories",
-      image: "https://cdn.dummyjson.com/products/images/Electronics/featured.png",
+      image: "https://picsum.photos/seed/clickcart-electronics/800/400",
     },
     {
       name: "Clothing",
       slug: "clothing",
       description: "Fashion apparel and accessories",
-      image: "https://cdn.dummyjson.com/products/images/Clothing/featured.png",
+      image: "https://picsum.photos/seed/clickcart-clothing/800/400",
     },
     {
       name: "Furniture",
       slug: "furniture",
       description: "Home and office furniture",
-      image: "https://cdn.dummyjson.com/products/images/Furniture/featured.png",
+      image: "https://picsum.photos/seed/clickcart-furniture/800/400",
     },
     {
       name: "Groceries",
       slug: "groceries",
       description: "Food, beverages, and daily essentials",
-      image: "https://cdn.dummyjson.com/products/images/Groceries/featured.png",
+      image: "https://picsum.photos/seed/clickcart-groceries/800/400",
     },
     {
       name: "Beauty",
       slug: "beauty",
       description: "Skincare, makeup, and personal care",
-      image: "https://cdn.dummyjson.com/products/images/Beauty/featured.png",
+      image: "https://picsum.photos/seed/clickcart-beauty/800/400",
     },
     {
       name: "Sports",
       slug: "sports-accessories",
       description: "Sports equipment and fitness gear",
-      image: "https://cdn.dummyjson.com/products/images/Sports%20Accessories/featured.png",
+      image: "https://picsum.photos/seed/clickcart-sports/800/400",
     },
   ];
 
@@ -78,9 +89,9 @@ async function main() {
     {
       title: "iPhone 15 Pro",
       description: "Apple iPhone 15 Pro with A17 Pro chip, titanium design, and 48MP camera system.",
-      price: 999.99,
+      price: 159999,
       stock: 50,
-      image: "https://cdn.dummyjson.com/products/images/smartphones/1.jpg",
+      image: "https://picsum.photos/seed/clickcart-iphone-15-pro/600/400",
       brand: "Apple",
       sku: "ELEC-001",
       weight: 0.187,
@@ -91,9 +102,9 @@ async function main() {
     {
       title: "Samsung Galaxy S24 Ultra",
       description: "Samsung flagship with S Pen, 200MP camera, and AI-powered features.",
-      price: 1199.99,
+      price: 189999,
       stock: 35,
-      image: "https://cdn.dummyjson.com/products/images/smartphones/2.jpg",
+      image: "https://picsum.photos/seed/clickcart-galaxy-s24/600/400",
       brand: "Samsung",
       sku: "ELEC-002",
       weight: 0.232,
@@ -104,9 +115,9 @@ async function main() {
     {
       title: "MacBook Pro 14-inch",
       description: "Apple MacBook Pro with M3 Pro chip, 18GB RAM, 512GB SSD.",
-      price: 1999.99,
+      price: 219999,
       stock: 20,
-      image: "https://cdn.dummyjson.com/products/images/laptops/1.jpg",
+      image: "https://picsum.photos/seed/clickcart-macbook-pro/600/400",
       brand: "Apple",
       sku: "ELEC-003",
       weight: 1.55,
@@ -117,9 +128,9 @@ async function main() {
     {
       title: "Sony WH-1000XM5",
       description: "Industry-leading noise canceling wireless headphones with 30-hour battery.",
-      price: 349.99,
+      price: 48999,
       stock: 75,
-      image: "https://cdn.dummyjson.com/products/images/headphones/1.jpg",
+      image: "https://picsum.photos/seed/clickcart-sony-headphones/600/400",
       brand: "Sony",
       sku: "ELEC-004",
       weight: 0.25,
@@ -131,9 +142,9 @@ async function main() {
     {
       title: "Classic White T-Shirt",
       description: "100% cotton comfortable everyday t-shirt.",
-      price: 24.99,
+      price: 899,
       stock: 200,
-      image: "https://cdn.dummyjson.com/products/images/mens-shirts/1.jpg",
+      image: "https://picsum.photos/seed/clickcart-tshirt/600/400",
       brand: "BasicWear",
       sku: "CLO-001",
       weight: 0.2,
@@ -144,9 +155,9 @@ async function main() {
     {
       title: "Slim Fit Jeans",
       description: "Modern slim fit denim jeans with stretch comfort.",
-      price: 59.99,
+      price: 2499,
       stock: 150,
-      image: "https://cdn.dummyjson.com/products/images/mens-shirts/2.jpg",
+      image: "https://picsum.photos/seed/clickcart-jeans/600/400",
       brand: "DenimCo",
       sku: "CLO-002",
       weight: 0.6,
@@ -157,9 +168,9 @@ async function main() {
     {
       title: "Winter Jacket",
       description: "Waterproof winter jacket with fleece lining and hood.",
-      price: 129.99,
+      price: 4999,
       stock: 80,
-      image: "https://cdn.dummyjson.com/products/images/mens-shirts/3.jpg",
+      image: "https://picsum.photos/seed/clickcart-jacket/600/400",
       brand: "WinterWear",
       sku: "CLO-003",
       weight: 1.2,
@@ -171,9 +182,9 @@ async function main() {
     {
       title: "Ergonomic Office Chair",
       description: "Adjustable lumbar support, breathable mesh, and armrests.",
-      price: 299.99,
+      price: 15999,
       stock: 40,
-      image: "https://cdn.dummyjson.com/products/images/furniture/1.jpg",
+      image: "https://picsum.photos/seed/clickcart-office-chair/600/400",
       brand: "ComfortPlus",
       sku: "FUR-001",
       weight: 15,
@@ -184,9 +195,9 @@ async function main() {
     {
       title: "Standing Desk",
       description: "Electric height-adjustable standing desk with memory presets.",
-      price: 499.99,
+      price: 24999,
       stock: 25,
-      image: "https://cdn.dummyjson.com/products/images/furniture/2.jpg",
+      image: "https://picsum.photos/seed/clickcart-standing-desk/600/400",
       brand: "WorkFit",
       sku: "FUR-002",
       weight: 30,
@@ -198,9 +209,9 @@ async function main() {
     {
       title: "Organic Coffee Beans",
       description: "Premium Arabica coffee beans, 1kg pack.",
-      price: 18.99,
+      price: 1299,
       stock: 300,
-      image: "https://cdn.dummyjson.com/products/images/groceries/1.jpg",
+      image: "https://picsum.photos/seed/clickcart-coffee/600/400",
       brand: "BrewMaster",
       sku: "GRO-001",
       weight: 1,
@@ -211,9 +222,9 @@ async function main() {
     {
       title: "Extra Virgin Olive Oil",
       description: "Cold-pressed extra virgin olive oil, 500ml.",
-      price: 12.99,
+      price: 999,
       stock: 250,
-      image: "https://cdn.dummyjson.com/products/images/groceries/2.jpg",
+      image: "https://picsum.photos/seed/clickcart-olive-oil/600/400",
       brand: "Mediterra",
       sku: "GRO-002",
       weight: 0.5,
@@ -225,9 +236,9 @@ async function main() {
     {
       title: "Vitamin C Serum",
       description: "Brightening vitamin C serum with hyaluronic acid, 30ml.",
-      price: 34.99,
+      price: 1899,
       stock: 120,
-      image: "https://cdn.dummyjson.com/products/images/fragrances/1.jpg",
+      image: "https://picsum.photos/seed/clickcart-serum/600/400",
       brand: "GlowUp",
       sku: "BEA-001",
       weight: 0.05,
@@ -239,9 +250,9 @@ async function main() {
     {
       title: "Yoga Mat",
       description: "Non-slip exercise yoga mat, 6mm thick.",
-      price: 29.99,
+      price: 1499,
       stock: 180,
-      image: "https://cdn.dummyjson.com/products/images/sports-accessories/1.jpg",
+      image: "https://picsum.photos/seed/clickcart-yoga-mat/600/400",
       brand: "FitLife",
       sku: "SPO-001",
       weight: 1,
@@ -252,9 +263,9 @@ async function main() {
     {
       title: "Adjustable Dumbbells",
       description: "Adjustable dumbbell set, 5-25kg per hand.",
-      price: 199.99,
+      price: 9999,
       stock: 30,
-      image: "https://cdn.dummyjson.com/products/images/sports-accessories/2.jpg",
+      image: "https://picsum.photos/seed/clickcart-dumbbells/600/400",
       brand: "PowerLift",
       sku: "SPO-002",
       weight: 25,
@@ -305,7 +316,7 @@ async function main() {
       code: "SAVE10",
       type: CouponType.PERCENT,
       value: 10,
-      minOrder: 20,
+      minOrder: 2000,
       maxDiscount: null,
       active: true,
       onePerUser: true,
@@ -322,8 +333,8 @@ async function main() {
     {
       code: "WELCOME5",
       type: CouponType.FIXED,
-      value: 5,
-      minOrder: 30,
+      value: 500,
+      minOrder: 3000,
       maxDiscount: null,
       active: true,
       onePerUser: true,
@@ -338,6 +349,34 @@ async function main() {
     });
     console.log(`Coupon: ${c.code}`);
   }
+
+  // ==================== SITE SETTINGS ====================
+  const siteSettingsData = {
+    storeName: "ClickCart",
+    tagline: "Your one-stop online shop for electronics, fashion and more",
+    hotline: "+880 1700-000000",
+    supportEmail: "support@clickcart.example",
+    announcement: "Free delivery inside Dhaka on orders over ৳5,000",
+    shippingInsideDhaka: "80",
+    shippingOutsideDhaka: "130",
+    freeShippingThreshold: "5000",
+    codEnabled: "true",
+    codMaxAmount: "50000",
+    deliveryEstimateInside: "1-2 working days",
+    deliveryEstimateOutside: "3-5 working days",
+    currency: "BDT",
+    emiMonths: "12",
+    emiInterestRate: "0",
+  };
+
+  for (const [key, value] of Object.entries(siteSettingsData)) {
+    await prisma.siteSetting.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    });
+  }
+  console.log("Site settings seeded");
 
   console.log("\nSeeding complete!");
 }

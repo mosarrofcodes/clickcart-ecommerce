@@ -3,14 +3,26 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/api";
 import { getOrCreateCart, cartSummary } from "@/lib/cart-service";
 
+type VariantLessRouteContext = { params: Promise<{ productId: string }> };
+
+async function getContext(
+  req: NextRequest,
+  ctx: VariantLessRouteContext,
+): Promise<{ productId: string; variantId: string | null }> {
+  const { productId } = await ctx.params;
+  const url = new URL(req.url);
+  const variantId = url.searchParams.get("variantId");
+  return { productId, variantId };
+}
+
 export async function PUT(
   req: NextRequest,
-  ctx: RouteContext<"/api/cart/items/[productId]">,
+  ctx: VariantLessRouteContext,
 ) {
   const { userId, error } = await requireUser();
   if (error) return error;
 
-  const { productId } = await ctx.params;
+  const { productId, variantId } = await getContext(req, ctx);
 
   let body: Record<string, unknown>;
   try {
@@ -28,16 +40,30 @@ export async function PUT(
     );
   }
 
+  const lineKey = variantId ? `${productId}::${variantId}` : productId;
+
   const product = await db.product.findUnique({
     where: { id: productId },
+    include: { variants: true },
   });
   if (!product) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
-  if (quantity > product.stock) {
+  const variant = variantId
+    ? product.variants.find((v) => v.id === variantId)
+    : null;
+  if (variantId && !variant) {
     return NextResponse.json(
-      { error: `Only ${product.stock} units of this item are in stock` },
+      { error: "Variant not found for this product" },
+      { status: 400 },
+    );
+  }
+
+  const available = variant ? variant.stock : product.stock;
+  if (quantity > available) {
+    return NextResponse.json(
+      { error: `Only ${available} units of this item are in stock` },
       { status: 400 },
     );
   }
@@ -47,7 +73,7 @@ export async function PUT(
     const hydratedCart = await cart;
 
     const result = await db.cartItem.updateMany({
-      where: { cartId: hydratedCart.id, productId },
+      where: { cartId: hydratedCart.id, lineKey },
       data: { quantity },
     });
 
@@ -64,20 +90,21 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
-  ctx: RouteContext<"/api/cart/items/[productId]">,
+  req: NextRequest,
+  ctx: VariantLessRouteContext,
 ) {
   const { userId, error } = await requireUser();
   if (error) return error;
 
-  const { productId } = await ctx.params;
+  const { productId, variantId } = await getContext(req, ctx);
+  const lineKey = variantId ? `${productId}::${variantId}` : productId;
 
   try {
     const cart = getOrCreateCart(userId as string);
     const hydratedCart = await cart;
 
     const result = await db.cartItem.deleteMany({
-      where: { cartId: hydratedCart.id, productId },
+      where: { cartId: hydratedCart.id, lineKey },
     });
 
     if (result.count === 0) {

@@ -35,6 +35,7 @@ const product: Product = {
   title: "Wireless Mouse",
   description: "A great mouse",
   price: 24.99,
+  oldPrice: null,
   stock: 10,
   image: "/mouse.jpg",
   brand: "ClickCart",
@@ -69,7 +70,7 @@ describe("ProductCard", () => {
     render(<ProductCard product={product} />);
 
     expect(screen.getByText("Wireless Mouse")).toBeInTheDocument();
-    expect(screen.getByText("$24.99")).toBeInTheDocument();
+    expect(screen.getByText("৳24.99")).toBeInTheDocument();
     expect(screen.getByText("Gadgets")).toBeInTheDocument();
   });
 
@@ -82,7 +83,7 @@ describe("ProductCard", () => {
     render(<ProductCard product={product} />);
 
     fireEvent.click(screen.getByRole("button", { name: /add to cart/i }));
-    expect(addItem).toHaveBeenCalledWith(product);
+    expect(addItem).toHaveBeenCalledWith(product, 1, undefined);
   });
 
   it("disables the button and shows Out of Stock when stock is zero", () => {

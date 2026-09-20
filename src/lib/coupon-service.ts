@@ -1,5 +1,9 @@
 import { db } from "@/lib/db";
-import type { Coupon, CouponType } from "@prisma/client";
+import { formatMoney } from "@/lib/currency";
+import { COUPON_TYPE_LABELS } from "@/lib/store-config";
+import type { Coupon } from "@prisma/client";
+
+export { COUPON_TYPE_LABELS };
 
 export interface CouponDiscount {
   discountAmount: number;
@@ -73,15 +77,9 @@ export async function findValidCoupon(
   if (subtotal < coupon.minOrder) {
     return {
       coupon: null,
-      error: `Minimum order of $${coupon.minOrder.toFixed(2)} required`,
+      error: `Minimum order of ${formatMoney(coupon.minOrder)} required`,
     };
   }
 
   return { coupon, discount: calculateCouponDiscount(coupon, subtotal) };
 }
-
-export const COUPON_TYPE_LABELS: Record<CouponType, string> = {
-  PERCENT: "% off",
-  FIXED: "$ off",
-  FREESHIP: "Free shipping",
-};

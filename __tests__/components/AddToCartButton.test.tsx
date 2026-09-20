@@ -18,6 +18,7 @@ const product: Product = {
   title: "Keyboard",
   description: "Mechanical",
   price: 39,
+  oldPrice: null,
   stock: 5,
   image: "/kb.jpg",
   brand: "KeyCo",
@@ -48,7 +49,7 @@ describe("AddToCartButton", () => {
 
     render(<AddToCartButton product={product} />);
     fireEvent.click(screen.getByRole("button", { name: /add to cart/i }));
-    expect(addItem).toHaveBeenCalledWith(product);
+    expect(addItem).toHaveBeenCalledWith(product, 1, undefined);
   });
 
   it("is disabled for out-of-stock products", () => {

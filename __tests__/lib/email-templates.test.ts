@@ -22,9 +22,9 @@ const ctx: OrderEmailContext = {
 };
 
 describe("formatMoney", () => {
-  it("formats numbers as dollars with two decimals", () => {
-    expect(formatMoney(9)).toBe("$9.00");
-    expect(formatMoney(49.5)).toBe("$49.50");
+  it("formats numbers as taka (BDT) with two decimals", () => {
+    expect(formatMoney(9)).toBe("৳9.00");
+    expect(formatMoney(49.5)).toBe("৳49.50");
   });
 });
 
@@ -34,8 +34,8 @@ describe("email templates", () => {
     expect(html).toContain("#oc_123");
     expect(html).toContain("Sadia Rahman");
     expect(html).toContain("Wireless Mouse");
-    expect(html).toContain("$25.00");
-    expect(html).toContain("$49.50");
+    expect(html).toContain("৳25.00");
+    expect(html).toContain("৳49.50");
     expect(html).toContain("Free");
   });
 
@@ -50,10 +50,10 @@ describe("email templates", () => {
     const html = paymentReceiptEmail(ctx);
     expect(html).toContain("#oc_123");
     expect(html).toContain("Payment received");
-    expect(html).toContain("$49.50");
+    expect(html).toContain("৳49.50");
   });
 
   it("mentions the discount in emails that show it", () => {
-    expect(orderConfirmationEmail(ctx)).toContain("-$5.50");
+    expect(orderConfirmationEmail(ctx)).toContain("-৳5.50");
   });
 });

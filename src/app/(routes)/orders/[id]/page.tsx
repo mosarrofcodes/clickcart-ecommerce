@@ -13,6 +13,10 @@ import {
 } from "@/lib/order-status";
 import CancelOrderButton from "@/components/order/CancelOrderButton";
 import PayNowButton from "@/components/order/PayNowButton";
+import { PrintButton } from "@/components/admin/OrderActions";
+import { formatMoney } from "@/lib/currency";
+import { getSiteSettings, isInsideDhaka } from "@/lib/site-settings";
+import { SITE_PHONE, SITE_EMAIL, SITE_ADDRESS } from "@/lib/site";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -33,13 +37,16 @@ export default async function OrderDetailsPage({ params, searchParams }: PagePro
   const { id } = await params;
   const { placed } = await searchParams;
 
-  const order = await db.order.findUnique({
-    where: { id },
-    include: {
-      items: { include: { product: true }, orderBy: { id: "asc" } },
-      payment: true,
-    },
-  });
+  const [order, settings] = await Promise.all([
+    db.order.findUnique({
+      where: { id },
+      include: {
+        items: { include: { product: true }, orderBy: { id: "asc" } },
+        payment: true,
+      },
+    }),
+    getSiteSettings(),
+  ]);
 
   if (!order || order.userId !== session.user.id) notFound();
 
@@ -52,35 +59,74 @@ export default async function OrderDetailsPage({ params, searchParams }: PagePro
     order.payment?.method === "sslcommerz" &&
     ["PENDING", "FAILED"].includes(order.payment.status);
 
+  const subtotal = Number(
+    order.items.reduce((s, i) => s + i.price * i.quantity, 0).toFixed(2),
+  );
+  const discount = Math.max(0, order.discount ?? 0);
+  const shipping =
+    order.shipping > 0
+      ? order.shipping
+      : Math.max(0, Number((order.total - subtotal + discount).toFixed(2)));
+  const insideDhaka = isInsideDhaka(order.district ?? order.city);
+  const estimatedDelivery = insideDhaka
+    ? settings.deliveryEstimateInside
+    : settings.deliveryEstimateOutside;
+
   return (
-    <main className="max-w-4xl mx-auto px-6 py-10">
-      {placed === "1" && (
-        <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg p-4 mb-8">
-          <CheckCircle2 className="w-6 h-6 text-green-600" />
+    <main className="max-w-4xl mx-auto px-6 py-10 print-order">
+      <header className="hidden print:block print-only mb-6">
+        <div className="flex items-start justify-between pb-4 border-b">
           <div>
-            <p className="font-semibold text-green-800">
-              Thank you! Your order has been placed.
+            <p className="text-2xl font-bold">ClickCart</p>
+            <p className="text-sm">
+              {SITE_ADDRESS}
+              <br />
+              {SITE_PHONE} · {SITE_EMAIL}
             </p>
-            <p className="text-sm text-green-700">
-              Order #{id.slice(-8).toUpperCase()} is now PENDING.
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-semibold">
+              Invoice #{id.slice(-8).toUpperCase()}
+            </p>
+            <p className="text-sm">
+              Date: {new Date(order.createdAt).toLocaleString()}
+            </p>
+            <p className="text-sm">
+              Status: <span className="font-semibold">{status}</span>
             </p>
           </div>
         </div>
-      )}
+      </header>
+      <div className="print-hidden">
+        {placed === "1" && (
+          <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg p-4 mb-8">
+            <CheckCircle2 className="w-6 h-6 text-green-600" />
+            <div>
+              <p className="font-semibold text-green-800">
+                Thank you! Your order has been placed.
+              </p>
+              <p className="text-sm text-green-700">
+                Order #{id.slice(-8).toUpperCase()} is now PENDING.
+              </p>
+            </div>
+          </div>
+        )}
 
-      <div className="flex items-start justify-between mb-2">
-        <h1 className="text-3xl font-bold">
-          Order #{id.slice(-8).toUpperCase()}
-        </h1>
-        <span
-          className={`text-sm font-medium px-3 py-1 rounded-full ${STATUS_COLORS[status]}`}
-        >
-          {status}
-        </span>
+        <div className="flex items-start justify-between mb-2">
+          <h1 className="text-3xl font-bold">
+            Order #{id.slice(-8).toUpperCase()}
+          </h1>
+          <span
+            className={`text-sm font-medium px-3 py-1 rounded-full ${STATUS_COLORS[status]}`}
+          >
+            {status}
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground mb-6">
+          Placed on {new Date(order.createdAt).toLocaleString()} · Invoice #
+          {id.slice(-8).toUpperCase()}
+        </p>
       </div>
-      <p className="text-sm text-muted-foreground mb-6">
-        Placed on {new Date(order.createdAt).toLocaleString()}
-      </p>
 
       {isCancelled ? (
         <div className="border border-red-200 bg-red-50 rounded-lg p-4 mb-8 text-sm text-red-700">
@@ -119,6 +165,15 @@ export default async function OrderDetailsPage({ params, searchParams }: PagePro
               </div>
             ))}
           </div>
+          <p className="mt-4 text-xs text-muted-foreground text-center">
+            Estimated delivery:
+            <span className="font-medium text-foreground">
+              {" "}
+              {estimatedDelivery}
+            </span>
+            {" "}
+            {insideDhaka ? "(Inside Dhaka)" : "(Outside Dhaka)"}
+          </p>
         </div>
       )}
 
@@ -140,15 +195,41 @@ export default async function OrderDetailsPage({ params, searchParams }: PagePro
                     {item.product.title}
                   </Link>
                 </p>
+                {item.variantName && (
+                  <p className="text-muted-foreground text-xs">
+                    {item.variantName}
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground">
-                  {item.quantity} × ${item.price.toFixed(2)}
+                  {item.quantity} × {formatMoney(item.price)}
                 </p>
               </div>
               <span className="font-semibold">
-                ${(item.price * item.quantity).toFixed(2)}
+                {formatMoney(item.price * item.quantity)}
               </span>
             </div>
           ))}
+        </div>
+
+        <div className="mt-5 pt-4 border-t space-y-2 text-sm">
+          <div className="flex justify-between text-muted-foreground">
+            <span>Subtotal</span>
+            <span>{formatMoney(subtotal)}</span>
+          </div>
+          <div className="flex justify-between text-muted-foreground">
+            <span>Shipping</span>
+            <span>{shipping === 0 ? "Free" : formatMoney(shipping)}</span>
+          </div>
+          {discount > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span>Discount</span>
+              <span>-{formatMoney(discount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-base pt-2 border-t">
+            <span>Total</span>
+            <span>{formatMoney(order.total)}</span>
+          </div>
         </div>
       </div>
 
@@ -160,6 +241,11 @@ export default async function OrderDetailsPage({ params, searchParams }: PagePro
               <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
               {order.address}
             </p>
+            {order.district && (
+              <p className="pl-6 text-xs">
+                District: {order.district}
+              </p>
+            )}
             <p className="flex items-center gap-2">
               <Phone className="w-4 h-4 shrink-0" />
               {order.phone}
@@ -197,16 +283,17 @@ export default async function OrderDetailsPage({ params, searchParams }: PagePro
             )}
             <p className="flex justify-between text-base font-bold text-foreground">
               <span>Total</span>
-              <span>${order.total.toFixed(2)}</span>
+              <span>{formatMoney(order.total)}</span>
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="print-hidden flex gap-3 flex-wrap">
         <PayNowButton orderId={order.id} payable={payable} />
         <CancelOrderButton orderId={order.id} cancellable={cancellable} />
         <ButtonLink label="Back to Orders" href="/orders" />
+        <PrintButton label="Print Invoice" />
       </div>
     </main>
   );

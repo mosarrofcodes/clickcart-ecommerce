@@ -14,6 +14,7 @@ export async function GET(
       where: { id },
       include: {
         category: true,
+        variants: true,
         reviews: {
           include: {
             user: { select: { id: true, name: true, image: true } },
@@ -80,6 +81,14 @@ export async function PUT(
       ? { description: String(body.description) }
       : {}),
     ...(body.price !== undefined ? { price: Number(body.price) } : {}),
+    ...(body.oldPrice !== undefined
+      ? {
+          oldPrice:
+            typeof body.oldPrice === "number" && body.oldPrice > Number(body.price ?? existing.price)
+              ? body.oldPrice
+              : null,
+        }
+      : {}),
     ...(body.stock !== undefined ? { stock: Number(body.stock) || 0 } : {}),
     ...(body.image !== undefined ? { image: String(body.image) } : {}),
     ...(body.brand !== undefined
@@ -97,14 +106,53 @@ export async function PUT(
       : {}),
   };
 
-  try {
-    const product = await db.product.update({
-      where: { id },
-      data,
-      include: { category: true },
-    });
+  const rawVariants: unknown[] = Array.isArray(body.variants)
+    ? body.variants
+    : [];
 
-    return NextResponse.json(product);
+  try {
+    const keptIds = rawVariants
+      .map((v) => (v as { id?: string } | null)?.id)
+      .filter((id): id is string => Boolean(id));
+
+    const product = await db.$transaction([
+      db.product.update({
+        where: { id },
+        data,
+        include: { category: true },
+      }),
+      db.productVariant.deleteMany({
+        where: { productId: id, id: { notIn: keptIds } },
+      }),
+      ...rawVariants.flatMap((raw) => {
+        const v = raw as {
+          id?: string;
+          name?: string;
+          price?: number;
+          stock?: number;
+          sku?: string | null;
+        };
+        if (typeof v.name !== "string" || !v.name.trim()) return [];
+        if (typeof v.price !== "number" || v.price <= 0) return [];
+        const dataVariant = {
+          name: v.name.trim(),
+          price: v.price,
+          stock: Number(v.stock) || 0,
+          sku: v.sku?.trim() || null,
+        };
+        return v.id
+          ? [
+              db.productVariant.upsert({
+                where: { id: v.id },
+                create: { productId: id, ...dataVariant },
+                update: dataVariant,
+              }),
+            ]
+          : [db.productVariant.create({ data: { productId: id, ...dataVariant } })];
+      }),
+    ]);
+
+    return NextResponse.json(product[0]);
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&

@@ -6,7 +6,7 @@ import { Filter, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PRODUCT_SORTS, type ProductSort } from "@/lib/product-query";
+import { PRODUCT_SORTS, type ProductSort } from "@/lib/store-config";
 
 const LIMITS = [12, 24, 48];
 

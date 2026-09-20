@@ -20,12 +20,16 @@ function makeCart(items: { price: number; quantity: number }[]): Cart {
       id: `item-${index}`,
       cartId: "cart-1",
       productId: `product-${index}`,
+      variantId: null,
+      lineKey: `product-${index}`,
       quantity: item.quantity,
+      variant: null,
       product: {
         id: `product-${index}`,
         title: `Product ${index}`,
         description: "desc",
         price: item.price,
+        oldPrice: null,
         stock: 10,
         image: "x.jpg",
         brand: null,
@@ -58,7 +62,7 @@ describe("computeShipping", () => {
 
   it("is free at or above the threshold", () => {
     expect(computeShipping(FREE_SHIPPING_THRESHOLD)).toBe(0);
-    expect(computeShipping(999)).toBe(0);
+    expect(computeShipping(FREE_SHIPPING_THRESHOLD + 1)).toBe(0);
   });
 });
 

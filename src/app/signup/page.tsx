@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShoppingCart, Loader2 } from "lucide-react";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import { toast } from "sonner";
 
 export default function SignUpPage() {
@@ -107,6 +108,8 @@ export default function SignUpPage() {
               )}
             </Button>
           </form>
+
+          <GoogleSignInButton />
 
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}

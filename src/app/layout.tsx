@@ -1,6 +1,9 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import CartDrawer from "@/components/cart/CartDrawer";
+import FloatingSupport from "@/components/layout/FloatingSupport";
 import Providers from "@/components/providers/SessionProvider";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { Inter, Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -82,7 +85,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html lang="en" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
         <script
           type="application/ld+json"
@@ -96,14 +99,23 @@ export default function RootLayout({
             __html: JSON.stringify(organizationJsonLd).replace(/</g, "\\u003c"),
           }}
         />
-        <Providers>
-          <Navbar />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Providers>
+            <Navbar />
 
-          <main className="flex-grow">{children}</main>
+            <main className="flex-grow">{children}</main>
 
-          <Footer />
-          <Toaster />
-        </Providers>
+            <Footer />
+            <CartDrawer />
+            <FloatingSupport />
+            <Toaster />
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );

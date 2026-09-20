@@ -26,6 +26,7 @@ function SessionSync() {
         mergedOnce.current = true;
         useCartStore.getState().mergeFromLocal();
         useWishlistStore.getState().mergeFromLocal();
+        useCartStore.getState().loadFromServer();
       }
     } else {
       setUser(null);
@@ -45,7 +46,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleOnline = () => {
       if (useAuthStore.getState().status === "authenticated") {
-        useCartStore.getState().mergeFromLocal();
+        useCartStore.getState().loadFromServer();
         useWishlistStore.getState().mergeFromLocal();
       }
     };

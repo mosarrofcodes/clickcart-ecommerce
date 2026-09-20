@@ -64,7 +64,7 @@ export default async function CategoryProductsPage({ params }: PageProps) {
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-10">
-      <Button variant="ghost" className="mb-6">
+      <Button asChild variant="ghost" className="mb-6">
         <Link href="/categories" className="flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" />
           Back to Categories

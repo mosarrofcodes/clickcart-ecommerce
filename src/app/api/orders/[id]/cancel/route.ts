@@ -49,10 +49,15 @@ export async function PUT(
         include: { items: true },
       }),
       ...order.items.map((item) =>
-        db.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        }),
+        item.variantId
+          ? db.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: { increment: item.quantity } },
+            })
+          : db.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: item.quantity } },
+            }),
       ),
     ]);
 

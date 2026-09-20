@@ -64,9 +64,9 @@ describe("CheckoutPage coupon input", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Coupon "SAVE10" applied — \$10\.00 off/)).toBeInTheDocument();
+      expect(screen.getByText(/Coupon "SAVE10" applied — ৳10\.00 off/)).toBeInTheDocument();
     });
-    expect(screen.getByText("-$10.00")).toBeInTheDocument();
+    expect(screen.getByText("-৳10.00")).toBeInTheDocument();
   });
 
   it("shows an error for an invalid coupon", async () => {

@@ -3,12 +3,12 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShoppingCart, Loader2 } from "lucide-react";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import { toast } from "sonner";
 
 export default function SignInPage() {
@@ -22,18 +22,19 @@ export default function SignInPage() {
     setLoading(true);
 
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (result?.error) {
-        toast.error("Invalid email or password");
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Invalid email or password");
       } else {
         toast.success("Signed in successfully!");
-        router.push("/");
-        router.refresh();
+        router.replace("/");
       }
     } catch {
       toast.error("Something went wrong");
@@ -91,7 +92,18 @@ export default function SignInPage() {
                 "Sign In"
               )}
             </Button>
+
+            <div className="text-center text-sm">
+              <Link
+                href="/forgot-password"
+                className="text-muted-foreground hover:text-primary hover:underline"
+              >
+                Forgot your password?
+              </Link>
+            </div>
           </form>
+
+          <GoogleSignInButton />
 
           <p className="text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}

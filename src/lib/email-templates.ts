@@ -16,9 +16,9 @@ export interface OrderEmailContext {
   phone: string;
 }
 
-export function formatMoney(value: number): string {
-  return `$${Number(value).toFixed(2)}`;
-}
+import { formatMoney } from "@/lib/currency";
+
+export { formatMoney };
 
 function baseLayout(title: string, bodyHtml: string): string {
   return `<!DOCTYPE html>
@@ -160,4 +160,28 @@ export function paymentReceiptEmail(ctx: OrderEmailContext): string {
     </table>
   `;
   return baseLayout(`Payment for order ${ctx.orderId}`, body);
+}
+
+export function passwordResetEmail(resetUrl: string): string {
+  const body = `
+    <h2 style="margin:0 0 8px;font-size:18px;">Reset your password</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:#52525b;">
+      We received a request to reset your ClickCart password. This link is valid
+      for the next 1 hour. If you did not request this, you can safely ignore
+      this email.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;">
+      <tr>
+        <td style="border-radius:8px;">
+          <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background-color:#18181b;color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Reset password</a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0;font-size:12px;color:#71717a;">
+      If the button does not work, copy and paste this link into your browser:
+      <br />
+      <span style="word-break:break-all;">${resetUrl}</span>
+    </p>
+  `;
+  return baseLayout("Reset your ClickCart password", body);
 }

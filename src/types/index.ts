@@ -8,11 +8,22 @@ export interface ProductCategory {
   updatedAt: Date;
 }
 
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  name: string;
+  price: number;
+  stock: number;
+  sku: string | null;
+  image: string | null;
+}
+
 export interface Product {
   id: string;
   title: string;
   description: string;
   price: number;
+  oldPrice: number | null;
   stock: number;
   image: string;
   brand: string | null;
@@ -24,10 +35,18 @@ export interface Product {
   createdAt: Date;
   updatedAt: Date;
   category: ProductCategory;
+  variants?: ProductVariant[];
+  _count?: { reviews?: number };
 }
 
 export interface CartItem extends Product {
   quantity: number;
+  variant?: ProductVariant | null;
+}
+
+export interface CartItemIdentity {
+  productId: string;
+  variantId?: string | null;
 }
 
 export interface Category {

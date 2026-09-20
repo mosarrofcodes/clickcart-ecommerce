@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PRODUCT_SORTS, type ProductSort } from "@/lib/product-query";
+import { PRODUCT_SORTS, type ProductSort } from "@/lib/store-config";
 
 const LIMITS = [12, 24, 48];
 
