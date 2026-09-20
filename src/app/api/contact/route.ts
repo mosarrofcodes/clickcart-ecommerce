@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notification";
+import { checkRateLimit, getClientIp, isHoneypot } from "@/lib/rate-limit";
 
 function escapeHtml(value: string): string {
   return value
@@ -12,11 +13,26 @@ function escapeHtml(value: string): string {
 }
 
 export async function POST(req: Request) {
+  const rate = checkRateLimit(`contact:${getClientIp(req)}`, {
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many messages sent. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rate.retryAfterMs / 1000)) } },
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (isHoneypot(body, "website")) {
+    return NextResponse.json({ ok: true }, { status: 201 });
   }
 
   const { name, email, subject, message } = body;

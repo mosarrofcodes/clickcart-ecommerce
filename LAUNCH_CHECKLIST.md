@@ -13,7 +13,7 @@ Tracked here so we advance one step at a time. Toggle each box from
 - [x] **Commit + push** to GitHub (done: `cc20d59`, branch `main` in sync with origin)
 - [x] **Neon:** export/verify production database (`ep-divine-king` ... direct URL verified, `PostgreSQL 18.6`)
 - [x] Run `npx prisma db push` + `npm run db:seed` against prod DB (admin / 6 categories / 14 products / 3 coupons seeded)
-- [ ] **Vercel:** import repo + set env vars (exact list below), first deploy
+- [x] **Vercel:** import repo + set env vars (exact list below), first deploy → **LIVE at https://clickcart-ecommerce.vercel.app** (smoke-tested: home 200, /api/products 200 with 14 prod records, /api/health ok)
 - [ ] **Domain:** attach custom domain, set `NEXT_PUBLIC_APP_URL` to real domain
 
 ### Vercel production env vars
@@ -32,7 +32,10 @@ Tracked here so we advance one step at a time. Toggle each box from
 - [ ] **Payments live** — apply for SSLCommerz live merchant, switch `SSLCOMMERZ_IS_LIVE=true`, re-test payment + IPN
 - [ ] **Email live** — confirm Resend domain, set `RESEND_API_KEY`
 - [ ] **Images live** — real Cloudinary keys, re-upload product images
-- [ ] **Security sprint** — rate limiting (auth/contact/newsletter), CAPTCHA, security headers (CSP/HSTS)
+- [x] **Security headers** (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) in `next.config.mjs`
+- [x] **Rate limiting** on auth (login/register/forgot/reset), contact, newsletter, coupon-validate (in-memory per-IP; `RATE_LIMIT_DISABLED=true` honored in tests)
+- [x] **Spam honeypot** on contact + newsletter forms (hidden `website` field)
+- [ ] **CAPTCHA** (hCaptcha/Turnstile) on register + contact — optional upgrade over honeypot
 - [ ] **Monitoring** — Sentry / Vercel Analytics, Neon backups, uptime alerts
 - [ ] **Trust & legal** — real business address/phone/socials, privacy/terms/return policies
 - [ ] **Payment badges** — only show methods you're authorized to use

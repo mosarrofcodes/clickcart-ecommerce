@@ -1,14 +1,30 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkRateLimit, getClientIp, isHoneypot } from "@/lib/rate-limit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: Request) {
+  const rate = checkRateLimit(`newsletter:${getClientIp(req)}`, {
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many subscription attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rate.retryAfterMs / 1000)) } },
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (isHoneypot(body, "website")) {
+    return NextResponse.json({ success: true });
   }
 
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";

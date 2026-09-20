@@ -3,10 +3,22 @@ import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { passwordResetEmail } from "@/lib/email-templates";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 export async function POST(req: Request) {
+  const rate = checkRateLimit(`forgot-password:${getClientIp(req)}`, {
+    limit: 3,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many password reset requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rate.retryAfterMs / 1000)) } },
+    );
+  }
+
   try {
     let body: { email?: string };
     try {

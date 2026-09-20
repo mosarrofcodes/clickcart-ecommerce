@@ -3,8 +3,20 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/api";
 import { getOrCreateCart, cartSummary } from "@/lib/cart-service";
 import { findValidCoupon } from "@/lib/coupon-service";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
+  const rate = checkRateLimit(`coupon-validate:${getClientIp(req)}`, {
+    limit: 60,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rate.retryAfterMs / 1000)) } },
+    );
+  }
+
   const { userId, error } = await requireUser();
   if (error) return error;
 
