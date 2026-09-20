@@ -10,9 +10,9 @@ Tracked here so we advance one step at a time. Toggle each box from
   (also: `.gitignore` now covers `test-results/`, `playwright-report/`, `debug/`)
 
 ## Stage B — Account setup (user, ~1-2 hours) + deploy
-- [ ] **Commit + push** to GitHub (prepare commit when requested)
-- [ ] **Neon:** create production database
-- [ ] Run `npx prisma db push` + `npm run db:seed` against prod DB
+- [x] **Commit + push** to GitHub (done: `cc20d59`, branch `main` in sync with origin)
+- [x] **Neon:** export/verify production database (`ep-divine-king` ... direct URL verified, `PostgreSQL 18.6`)
+- [x] Run `npx prisma db push` + `npm run db:seed` against prod DB (admin / 6 categories / 14 products / 3 coupons seeded)
 - [ ] **Vercel:** import repo + set env vars (exact list below), first deploy
 - [ ] **Domain:** attach custom domain, set `NEXT_PUBLIC_APP_URL` to real domain
 
