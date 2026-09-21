@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export async function POST(req: Request) {
   const rate = checkRateLimit(`register:${getClientIp(req)}`, {
@@ -16,11 +17,21 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { name, email, password } = await req.json();
+    const body = (await req.json()) as Record<string, unknown>;
+    const name = typeof body.name === "string" ? body.name : "";
+    const email = typeof body.email === "string" ? body.email : "";
+    const password = typeof body.password === "string" ? body.password : "";
 
     if (!name || !email || !password) {
       return NextResponse.json(
         { error: "Name, email, and password are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!(await verifyTurnstile(body))) {
+      return NextResponse.json(
+        { error: "Please complete the security check and try again" },
         { status: 400 }
       );
     }

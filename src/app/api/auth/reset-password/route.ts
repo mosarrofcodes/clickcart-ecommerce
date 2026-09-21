@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export async function POST(req: Request) {
   const rate = checkRateLimit(`reset-password:${getClientIp(req)}`, {
@@ -16,11 +17,18 @@ export async function POST(req: Request) {
   }
 
   try {
-    let body: { token?: string; email?: string; password?: string };
+    let body: Record<string, unknown>;
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    if (!(await verifyTurnstile(body))) {
+      return NextResponse.json(
+        { error: "Please complete the security check and try again" },
+        { status: 400 },
+      );
     }
 
     const token = typeof body.token === "string" ? body.token.trim() : "";

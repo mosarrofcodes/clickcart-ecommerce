@@ -9,24 +9,32 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShoppingCart, Loader2 } from "lucide-react";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
+import TurnstileCaptcha, {
+  turnstileSiteKey,
+} from "@/components/auth/TurnstileCaptcha";
 import { toast } from "sonner";
 
 export default function SignUpPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (turnstileSiteKey && !captchaToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
     setLoading(true);
 
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, captchaToken: captchaToken ?? "" }),
       });
 
       const data = await res.json();
@@ -96,6 +104,8 @@ export default function SignUpPage() {
                 minLength={6}
               />
             </div>
+
+            <TurnstileCaptcha onChange={setCaptchaToken} />
 
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? (

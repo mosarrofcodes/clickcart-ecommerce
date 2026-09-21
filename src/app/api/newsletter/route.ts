@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkRateLimit, getClientIp, isHoneypot } from "@/lib/rate-limit";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -25,6 +26,13 @@ export async function POST(req: Request) {
 
   if (isHoneypot(body, "website")) {
     return NextResponse.json({ success: true });
+  }
+
+  if (!(await verifyTurnstile(body))) {
+    return NextResponse.json(
+      { error: "Please complete the security check and try again" },
+      { status: 400 },
+    );
   }
 
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";

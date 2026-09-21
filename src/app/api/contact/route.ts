@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notification";
 import { checkRateLimit, getClientIp, isHoneypot } from "@/lib/rate-limit";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 function escapeHtml(value: string): string {
   return value
@@ -33,6 +34,13 @@ export async function POST(req: Request) {
 
   if (isHoneypot(body, "website")) {
     return NextResponse.json({ ok: true }, { status: 201 });
+  }
+
+  if (!(await verifyTurnstile(body))) {
+    return NextResponse.json(
+      { error: "Please complete the security check and try again" },
+      { status: 400 },
+    );
   }
 
   const { name, email, subject, message } = body;

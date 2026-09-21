@@ -17,31 +17,24 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Status:** Full-stack prototype (Next.js 16 + Prisma + Neon PostgreSQL)
 - **Tech Stack:** Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, Prisma + Neon
 
-## Current Progress (as of Sep 17, 2026)
+## Current Progress (as of Sep 21, 2026)
 
 ### Completed
 
-- Phases 1–13 complete: DB + seeding, NextAuth auth, Zustand stores, product/category system, cart (API + UI + persistence), checkout & orders (API + UI), SSLCommerz payment integration, user profile (account info, password change, address book), admin dashboard (products/orders/users/categories + stats + print), reviews & wishlist (server-synced), search & filtering (URL filters, sort, pagination, debounced search bar with suggestions), coupon system (server-validated, admin CRUD, 3 coupon types), email (Resend + dev fallback, HTML templates), in-app notifications (Notification + NotificationPreference models, lifecycle-wired), 91 Jest tests (unit + API + component), Playwright E2E specs, Performance & SEO (ISR on public pages, image priority/lazy loading, Suspense streaming, caching headers, bundle analysis; sitemap.xml, robots.txt, Open Graph/Twitter images via ImageResponse, JSON-LD WebSite/Organization/Product/BreadcrumbList, full metadata + canonical per page)
-- Phase 14 (deployment readiness, code side): `.env.example` + `AUTH_TRUST_HOST=true` (fixes `/api/auth` 500 under `next start` — verified 200), `middleware.ts` → `proxy.ts` (Next 16 deprecation gone; guard verified), Prisma `binaryTargets` for Vercel Lambda, `vercel.json` (prisma generate + build), GitHub Actions CI + Vercel deploy workflows, `.gitignore` un-ignores `.env.example`
-- TypeScript migration, error boundaries, loading states, Cloudinary image upload
-- Project context maintained in `PROJECT_STATUS.md`, `PROJECT_PLAN.md`
+- Phases 1–13 complete: DB + seeding, NextAuth auth, Zustand stores, product/category system, cart (API + UI + persistence), checkout & orders (API + UI), SSLCommerz payment integration, user profile (account info, password change, address book), admin dashboard (products/orders/users/categories + stats + print), reviews & wishlist (server-synced), search & filtering (URL filters, sort, pagination, debounced search bar with suggestions), coupon system (server-validated, admin CRUD, 3 coupon types), email (Resend + dev fallback, HTML templates), in-app notifications (Notification + NotificationPreference models, lifecycle-wired), 117 Jest tests (unit + API + component), Playwright E2E specs, Performance & SEO (ISR on public pages, image priority/lazy loading, Suspense streaming, caching headers, bundle analysis; sitemap.xml, robots.txt, Open Graph/Twitter images via ImageResponse, JSON-LD WebSite/Organization/Product/BreadcrumbList, full metadata + canonical per page), TypeScript migration, error boundaries, loading states, Cloudinary image upload
+- **Phase 14 (deployment) — app is LIVE at https://clickcart-ecommerce.vercel.app** on Vercel + Neon prod DB (`ep-divine-king-b41ly5f0`, seeded: admin, 6 categories, 14 products, 3 coupons, site settings). All code committed (`cc20d59`), pushed to `origin/main`, GitHub Actions CI active
+- Security hardening (committed `c48ed5e`): env-driven `ADMIN_SEED_PASSWORD`, debug artifacts removed, in-memory rate limiting (login/register/forgot/reset-password/contact/newsletter/coupon-validate), honeypot fields on Contact/Newsletter, security headers (HSTS preload, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy)
+- Cloudflare Turnstile CAPTCHA: server verify lib (`src/lib/turnstile.ts`) + self-configuring widget (`TurnstileCaptcha`) wired into login/register/forgot/reset-password/contact/newsletter; active only when `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` set (honeypot remains as fallback). 22 suites / 129 tests pass
+- Vercel Hobby limit: only 1 cron/day → daily `cancel-stale-pending` only (health keepalive cron removed); free UptimeRobot ping to `/api/health` is the recommended warm-up
+- `.env.example` rebuilt and committed with all keys documented; `DATABASE_KEEPALIVE_MS=30000` in dev `.env`
+- See `PROJECT_STATUS.md` for the full phase-by-phase record
 
-### Uncommitted Changes
+### Remaining (Needs User Account/Decisions)
 
-All changes from the TypeScript migration onward are **uncommitted**. Run `git status` to see:
-- Deleted `.jsx` files, TSX conversions across `src/app` and `src/components`
-- New: `src/middleware.ts` → renamed `src/proxy.ts`, `src/types/`, `prisma/`, `src/store/`, `src/lib/{api,cart-service,cloudinary,order-status,review-service,product-query,sslcommerz,email,notification,coupon-service,site}.ts`, `src/app/api/**`, `src/components/{admin,order,profile,product,search,layout}/`, error/loading pages
-- New: `src/app/api/payments/sslcommerz/*`, `src/app/(routes)/payment/status`
-- New: `src/app/api/user/{profile,password,addresses,notification-preference}/**`, `src/app/(routes)/profile`, `src/components/profile/`
-- New: `src/app/admin/**`, `src/components/admin/*`, `src/app/api/{reviews,wishlist,users/[id],coupons/**,notifications/**}/**`, `src/app/api/orders/[id]/status`, `src/app/(routes)/wishlist`, `src/app/(routes)/notifications`
-- New: `__tests__/` (14 test files, 91 tests), `playwright.config.ts`, `e2e/` (3 Playwright specs)
-- New: `jest.config.mjs`, `jest.setup.ts`
-- New (Phase 13): `src/app/sitemap.ts`, `src/app/robots.ts`, `src/app/opengraph-image.tsx`, `src/app/twitter-image.tsx`, `src/lib/site.ts`
-- Updated (Phase 13): `next.config.mjs` (caching headers + bundle analyzer wiring), `package.json` / `package-lock.json` (`@next/bundle-analyzer` devDep)
-- New (Phase 14): `vercel.json`, `.github/workflows/{ci,deploy}.yml`, `.env.example` (now committed — `.gitignore` un-ignores it), Prisma `binaryTargets` serverless targets in `prisma/schema.prisma`
-- Schema additions: `User.isBlocked`, `Wishlist`, `Notification`, `NotificationPreference`, `Coupon`, `CouponUse` models, `CouponType` enum, `Order.couponId` + `Order.discount` (all `prisma db push`ed)
-
-**ACTION NEEDED:** Commit Phases 10–14, then `git push origin main` and continue Phase 14 account steps (Vercel: env vars + deploy; Neon prod DB; GitHub secrets; custom domain).
+- Custom domain attach → update `NEXT_PUBLIC_APP_URL`
+- Live SSLCommerz merchant creds (`SSLCOMMERZ_IS_LIVE=true`), live Resend + Cloudinary keys
+- Add Turnstile keys (`TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) to Vercel env to activate the CAPTCHA (code already deploy-ready)
+- Optional: Vercel KV rate limiting, Sentry monitoring, rotate Neon prod DB password
 
 ## Roadmap
 
@@ -68,7 +61,7 @@ All changes from the TypeScript migration onward are **uncommitted**. Run `git s
 
 ### Current Active Task
 
-- **Phase 14:** Deployment (Next — commit Phases 10–13, then Vercel/Neon/GitHub account steps: env vars, deploy, custom domain)
+- **Phase 14:** Deployment (Next — custom domain, live SSLCommerz/Resend/Cloudinary credentials, Turnstile keys; optional KV rate limiting, monitoring)
 
 ## Important Decisions
 

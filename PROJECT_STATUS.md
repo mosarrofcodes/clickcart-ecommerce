@@ -1,6 +1,6 @@
 # ClickCart — Project Status
 
-**Last updated:** Sep 18, 2026
+**Last updated:** Sep 21, 2026
 
 ## Overall Progress
 
@@ -19,7 +19,7 @@
 | Phase 11: Email & Notifications | COMPLETE ✅ | 100%     |
 | Phase 12: Testing               | COMPLETE ✅ | 100%     |
 | Phase 13: Performance & SEO     | COMPLETE ✅ | 100%     |
-| Phase 14: Deployment            | IN PROGRESS | 60%      |
+| Phase 14: Deployment            | IN PROGRESS | 80%      |
 
 ## Phase 1: Backend Foundation
 
@@ -418,31 +418,66 @@ Business-facing features added on top of the 14 phases to make the storefit for 
 
 - `notifyOrderPlaced` was passed a malformed payload (missing `product`) so order-confirmation emails silently failed — fixed by passing the correct `OrderWithItems` shape; `OrderWithItems.items` now carries resolved `title` + optional `variantName`
 
+## Security Hardening (Sep 21) ✅
+
+- **Admin password env-driven:** `prisma/seed.ts` admin password reads `ADMIN_SEED_PASSWORD` (fallback `changeMeOnFirstRun_9f3K!` + warning if unset) — no hardcoded password in committed code
+- **Pre-launch artifact cleanup:** `debug/`, `check-db.tmp.ts`, `test-results/`, `playwright-report/` deleted; `.gitignore` covers `test-results/` + `playwright-report/` + `debug/`
+- **Rate limiting:** new `src/lib/rate-limit.ts` — in-memory fixed-window `checkRateLimit(id, {limit, windowMs})` + `getClientIp(request)`; honors `RATE_LIMIT_DISABLED=true`. Wired into login (10/15min), register (5/hr), forgot-password (3/hr), reset-password (5/15min), contact (5/hr), newsletter (5/hr), coupon-validate (60/10min) with 429 + `Retry-After`
+- **Honeypot:** hidden `website` input on `ContactForm` + `NewsletterForm`; `isHoneypot()` rejects fills
+- **Security headers** (`next.config.mjs`): HSTS (preload), `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera/mic/geo/topics off)
+- **Tests:** `__tests__/lib/rate-limit.test.ts` (11 tests) → **20 suites / 117 tests pass**; lint, tsc, prod build clean
+- Committed `e339816` (cron cleanup — Hobby limit) + `c48ed5e` (security sprint); Vercel auto-deploying
+- Note: rate limiter is per-Lambda-instance in-memory (adequate, not global). Vercel KV-backed limiting is a possible upgrade
+
+## Cloudflare Turnstile CAPTCHA (Sep 22) ✅
+
+- **Server lib `src/lib/turnstile.ts`:** `verifyTurnstileToken()` calls Cloudflare `siteverify` (`https://challenges.cloudflare.com/turnstile/v0/siteverify`) with the secret, returns `true` only on `success`. `turnstileEnabled()` requires **both** `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; when unconfigured everything short-circuits to allowed (no behavior change — same self-configuring pattern as Google OAuth). `verifyTurnstile(body)` helper reads `captchaToken` out of a request body
+- **Widget `src/components/auth/TurnstileCaptcha.tsx`:**
+  - Renders nothing until `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set (exported `turnstileSiteKey` constant forms use to gate the submit button)
+  - Loads the Turnstile script once (`?render=explicit`) via a small Promise-based loader (no `next/script`), then `window.turnstile.render()` with callback / expired / error handlers (exposes `theme` + `action` props; UX CTA button disabled until a token exists)
+- **Server-side enforcement in 6 routes:** `POST /api/auth/login`, `register`, `forgot-password`, `reset-password`, `contact`, `newsletter`. Honeypot stays as the cheap pre-captcha layer on contact/newsletter. Failed verification → 400 "Please complete the security check and try again"
+- **Client wiring in 6 forms:** `/signin`, `/signup`, `/forgot-password`, `/reset-password` pages, `ContactForm`, `NewsletterForm` — token sent as `captchaToken`, submit gated client-side when the widget is active, widget remounted (key nonce) after a successful contact send
+- **`.env.example`:** documents `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (leave empty → honeypot-only mode)
+- **Tests:** `__tests__/lib/turnstile.test.ts` (9 tests, node env, mocked `fetch`) + `__tests__/components/TurnstileCaptcha.test.tsx` (renders null without key) → **22 suites / 129 tests pass**; lint clean, `tsc --noEmit` clean, production build passes
+- Note: needs a Cloudflare account to mint keys (free). Add `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` to Vercel env to activate — no redeploy logic change needed
+
 ## Phase 14: Deployment ⏳
 
-### Unit 14.1: Environment Setup ⚠️ (in progress)
+### Unit 14.1: Environment Setup ✅
 
-- [x] Create `.env.example` — production-ready template (DATABASE_URL, AUTH_SECRET, AUTH_TRUST_HOST, Cloudinary, NEXT_PUBLIC_* URLs, SSLCommerz, Resend); `.env` (gitignored) keeps real secrets
+- [x] Create `.env.example` — production-ready template (DATABASE_URL, AUTH_SECRET, AUTH_TRUST_HOST, Cloudinary, NEXT_PUBLIC_* URLs, SSLCommerz, Resend, CRT_SECRET, AUTO_CANCEL_PENDING_HOURS, Google OAuth, site contact/social); `.env` (gitignored) keeps real secrets
 - [x] `.gitignore` now un-ignores `.env.example` so the template is committed
 - [x] Vercel config — `vercel.json` with `buildCommand: "prisma generate && npm run build"`
 - [x] Prisma serverless targets — `binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]` for Vercel Lambda
-- [ ] **Needs user:** create Vercel project (`vercel link`) + set env vars (DATABASE_URL, AUTH_SECRET, AUTH_TRUST_HOST=true, NEXT_PUBLIC_APP_URL, CLOUDINARY_*, RESEND_API_KEY, SSLCOMMERZ_*)
-- [ ] **Needs user:** create Neon production database; run `npx prisma db push` + `npm run db:seed` against it
+- [x] Vercel project created (Git import) + production env vars set (DATABASE_URL direct, AUTH_SECRET, AUTH_TRUST_HOST=true, NEXT_PUBLIC_APP_URL, SSLCOMMERZ sandbox; RESEND/CLOUDINARY intentionally empty → dev-fallback verified). `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `CLOUDINARY_*` etc. pending until live accounts
+- [x] Neon production database created (`ep-divine-king-b41ly5f0`); `prisma db push` + `npm run db:seed` run (admin, 6 categories, 14 products, 3 coupons, site settings)
 
-### Unit 14.2: Deployment ⚠️ (in progress)
+### Unit 14.2: Deployment ✅
 
 - [x] CI/CD — `.github/workflows/ci.yml` (lint + typecheck + tests on push/PR) and `.github/workflows/deploy.yml` (Vercel `--prod` on push to `main`, uses `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` repo secrets)
 - [x] Auth production fix — added `AUTH_TRUST_HOST=true` (Auth.js v5 requires it on Vercel/hosted); smoke-tested under `next start`: `/api/auth/session` + `/api/auth/providers` now return 200 (were 500)
 - [x] `middleware.ts` → `proxy.ts` rename (Next 16 deprecation removed; matcher also excludes sitemap/robots/og-image routes); verified in build route table + redirect guard on `/checkout`
-- [ ] **Needs user:** `git push origin main` (first deploy), add repo secrets, run Vercel deployment
-- [ ] **Needs user:** attach custom domain + SSL (Vercel issues cert automatically)
+- [x] Phases 10–14 + pre-launch hardening committed (`cc20d59`) and pushed; branch `main` in sync with `origin`
+- [x] **LIVE at https://clickcart-ecommerce.vercel.app** — smoke-tested (home 200, `/api/products` returns prod data, `/api/health` → `{"ok":true}`; deployment eager-builds one preview earlier)
+- [x] Vercel Hobby cron limit (1/day) applied — removed `*/2` health keepalive cron; only daily cancel-stale-pending cron remains
+- [ ] **Needs user:** attach custom domain + SSL (Vercel issues cert automatically); set `NEXT_PUBLIC_APP_URL` to the real domain
 - [ ] **Needs user:** switch SSLCommerz to live credentials when ready (`SSLCOMMERZ_IS_LIVE=true`)
+- [ ] **Needs user:** live Resend keys + from-domain, Cloudinary keys (enables product image uploads)
 
 ## Current Active Task
 
-- **Phase 14:** Deployment — code/config done; production-hardening features (settings/shipping, order lifecycle, variants, catalog, trust pages, tracking, reports, Google OAuth) complete. Real-storefront feature pass complete (see below). Remaining steps need Vercel/Neon/GitHub account access (env vars, commit + push, domain).
+- **Phase 14:** Deployment — **PRODUCTION IS LIVE at https://clickcart-ecommerce.vercel.app** (Vercel + Neon prod DB seeded). Security sprint done (rate limiting, honeypot, headers, env-driven admin seed password) + Cloudflare Turnstile CAPTCHA implemented (server verify lib + self-configuring widget on 6 forms; activates when keys are added). Remaining items need user accounts/decisions: custom domain, live SSLCommerz credentials, live Resend/Cloudinary keys, add Turnstile keys to Vercel env.
 
 ## Recent Changes
+
+- **Cloudflare Turnstile CAPTCHA (Sep 22):** server verify lib (`src/lib/turnstile.ts` — Cloudflare `siteverify`, auto-disabled until `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` both set) + self-configuring `TurnstileCaptcha` client widget (script loads on demand, explicit render, renders null without a site key). Enforced server-side on 6 routes (login, register, forgot/reset-password, contact, newsletter; honeypot kept as fallback) with the widget on 6 forms (signin, signup, forgot/reset-password pages, ContactForm, NewsletterForm). `.env.example` documents the keys. Tests added (`__tests__/lib/turnstile.test.ts` 9 tests + `TurnstileCaptcha.test.tsx`) → **22 suites / 129 tests pass**; lint, `tsc --noEmit`, and production build all clean
+- **Go-live + security sprint (Sep 21):** 
+  - Committed + pushed Phases 10–14 and pre-launch hardening (`cc20d59`) and security sprint (`c48ed5e`); removed keepalive cron (`e339816`) — Vercel Hobby allows 1 cron/day
+  - Neon prod DB created (`ep-divine-king-b41ly5f0`, PostgreSQL 18.6) with direct URL, `prisma db push` + seed (admin, 6 categories, 14 products, 3 coupons, site settings)
+  - Vercel: project imported from GitHub, prod env vars set (DATABASE_URL direct, AUTH_SECRET, AUTH_TRUST_HOST=true, NEXT_PUBLIC_APP_URL, CRON_SECRET, AUTO_CANCEL_PENDING_HOURS=24, SSLCommerz sandbox; RESEND/CLOUDINARY empty → dev-fallback verified). Live at https://clickcart-ecommerce.vercel.app — `/api/health` → `{"ok":true}`, home + products API return prod data
+  - Security hardening: `ADMIN_SEED_PASSWORD` env-driven seeding; deleted debug artifacts; rate limiting (login/register/forgot/reset-password/contact/newsletter/coupon-validate) + honeypot fields + security headers; **20 suites / 117 tests pass**, lint/tsc/build clean
+  - PromoBanner dark-mode CTA contrast fix (`bg-white text-slate-900`)
+  - `.env.example` rebuilt (was empty in working tree) with all keys documented; `DATABASE_KEEPALIVE_MS=30000` added to dev `.env`
 
 - **Bug fix (Sep 21): client pages crashing with `PrismaClient is unable to run in this browser environment`.** Root cause: client components imported pure helpers from server-only modules (`src/lib/cart-service.ts`, `site-settings.ts`, `product-query.ts`, `coupon-service.ts`) that `import { db }` from `@/lib/db`, bundling PrismaClient into the browser — broke `/products` filters, cart page, checkout, `/admin/coupons`. Fix: moved all db-free helpers (shipping calc, EMI, site defaults, product sorts, coupon labels) into a new pure `src/lib/store-config.ts`; the db modules now re-export from it; client files import from `store-config`. Added `import "server-only"` to `src/lib/db.ts` (+ `jest.server-only.js` stub + `jest.config.mjs` moduleNameMapper) so any future client→db leak fails the build instead of crashing at runtime. Verified: lint clean, `tsc --noEmit` clean, 106 tests / 19 suites pass, production build passes.
 
@@ -547,21 +582,23 @@ Business-facing features added on top of the 14 phases to make the storefit for 
 
 ## Known Issues
 
-- Upload endpoint returns 500 if Cloudinary env keys are empty — fill `CLOUDINARY_*` in `.env` (no function until then)
+- Upload endpoint returns 500 if Cloudinary env keys are empty — fill `CLOUDINARY_*` in Vercel env (no function until then)
 - `@next/bundle-analyzer` only works with webpack — Next 16 defaults to Turbopack, so run `set ANALYZE=true&& npx next build --webpack` to regenerate `.next/analyze/` reports
 - `npm audit` reports vulnerabilities (dev tooling related, non-blocking)
-- Neon free tier cold-starts connections (~2–7s per first query) — interactive Prisma transactions can time out if the compute is asleep; array transactions avoid this
-- SSLCommerz requires internet access to sandbox/live gateway — init/verify calls will fail without connectivity or when `SSLCOMMERZ_STORE_ID`/`SSLCOMMERZ_STORE_PASSWD` are unset (returns 500 with logging); sandbox creds now present in `.env`
+- Neon free tier cold-starts connections (~2–7s per first query) — interactive Prisma transactions can time out if the compute is asleep; array transactions avoid this. Dev `.env` uses `DATABASE_KEEPALIVE_MS=30000`; prod free UptimeRobot ping to `/api/health` recommended (Vercel Hobby can't keep warm via cron)
+- Vercel Hobby plan: max **1 cron/day** — health keepalive cron removed; only daily `cancel-stale-pending` remains
+- Rate limiter is in-memory **per Lambda instance** — adequate for basic abuse protection, not a global budget; Vercel KV-backed limiting is the upgrade path
+- SSLCommerz requires internet access to sandbox/live gateway — init/verify calls will fail without connectivity or when `SSLCOMMERZ_STORE_ID`/`SSLCOMMERZ_STORE_PASSWD` are unset (returns 500 with logging); sandbox creds present in Vercel env
 - SSLCommerz sandbox init was broken — the v3 `gwprocess/v4/process.php` endpoint is expired (returns "API Expired"); fixed by migrating to `gwprocess/v4/api.php` (+ `validationserverAPI.php`). Sandbox session init verified via the app's exact payload → returns `SUCCESS` + `GatewayPageURL` for both card and `payment_method=bkash`. Full success callback (sandbox test payment → `/api/payments/sslcommerz/success`) still needs one manual sandbox payment; IPN trusts gateway `status` + amount match
-- Playwright E2E specs written but not yet run — requires `npx playwright install chromium` + running dev/build server + seeded DB
 - Google sign-in is hidden unless `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set (and the Google Cloud console redirect URI `…/api/auth/callback/google` is registered)
-- SSLCommerz live payments untested until `.env` switches from sandbox (`SSLCOMMERZ_IS_LIVE=false`, `testbox`) to live credentials
+- SSLCommerz live payments untested until env switches from sandbox (`SSLCOMMERZ_IS_LIVE=false`, `testbox`) to live credentials
+- Neon prod DB password was pasted in chat during setup — recommend rotating the database password in Neon once the site is fully public
 
 ## Next Steps
 
-1. Commit all Phases 10–14 changes (currently uncommitted) and `git push origin main` — CI runs automatically; add GitHub secrets and run the Vercel deploy workflow
-2. Vercel: import repo / `vercel link`, configure production env vars (see `.env.example`), first build will `prisma generate` then deploy
-3. Neon: create production database, `npx prisma db push` + `npm run db:seed`
-4. Attach custom domain in Vercel (SSL is automatic) and set `NEXT_PUBLIC_APP_URL` to the real domain so `metadataBase`/sitemap/robots resolve correctly
-5. Set `AUTH_TRUST_HOST=true` in Vercel env (required, already in `.env.example`)
-6. Enable GitHub Actions on the repo if not automatic
+1. **Optional (user):** buy/attach a custom domain in Vercel → update `NEXT_PUBLIC_APP_URL` to the real domain → redeploy so `metadataBase`/sitemap/robots/OG resolve correctly (+ verify admin login at `/admin` with seeded admin credentials)
+2. **Turnstile activation (user, free):** create a Cloudflare account → mint Turnstile keys → set `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in Vercel env (code is deploy-ready; re-verify with a login after adding)
+3. **Live credentials (user accounts):** SSLCommerz live merchant → `SSLCOMMERZ_IS_LIVE=true`; Resend domain + API key (enables real email templates); Cloudinary keys (enables admin image upload)
+4. **Monitoring (recommended):** UptimeRobot ping to `/api/health` every 5 min (keeps Neon warm + alerting); Sentry for runtime error tracking
+5. **Optional hardening:** Vercel KV-backed global rate limiting; security headers tune (CSP)
+6. **Ops:** rotate Neon prod DB password; GitHub Actions CI is active (runs lint/typecheck/tests on push; deploy workflow on push to `main`)

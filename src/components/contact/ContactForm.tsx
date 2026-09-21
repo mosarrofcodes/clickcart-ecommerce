@@ -7,9 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import TurnstileCaptcha, {
+  turnstileSiteKey,
+} from "@/components/auth/TurnstileCaptcha";
 
 export default function ContactForm() {
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaNonce, setCaptchaNonce] = useState(0);
   const [sending, setSending] = useState(false);
   const websiteRef = useRef<HTMLInputElement>(null);
 
@@ -27,13 +32,21 @@ export default function ContactForm() {
       toast.error("Please enter a valid email address.");
       return;
     }
+    if (turnstileSiteKey && !captchaToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
 
     setSending(true);
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, website: websiteRef.current?.value ?? "" }),
+        body: JSON.stringify({
+          ...form,
+          website: websiteRef.current?.value ?? "",
+          captchaToken: captchaToken ?? "",
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -42,6 +55,8 @@ export default function ContactForm() {
       }
       toast.success("Message sent! We'll get back to you soon.");
       setForm({ name: "", email: "", subject: "", message: "" });
+      setCaptchaToken(null);
+      setCaptchaNonce((n) => n + 1);
     } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -78,6 +93,8 @@ export default function ContactForm() {
         <Label htmlFor="message">Message</Label>
         <Textarea id="message" rows={5} value={form.message} onChange={update("message")} placeholder="How can we help?" />
       </div>
+      <TurnstileCaptcha key={captchaNonce} onChange={setCaptchaToken} />
+
       <Button type="submit" disabled={sending}>
         {sending ? (
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />

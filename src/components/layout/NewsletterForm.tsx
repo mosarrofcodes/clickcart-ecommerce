@@ -5,9 +5,13 @@ import { toast } from "sonner";
 import { Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import TurnstileCaptcha, {
+  turnstileSiteKey,
+} from "@/components/auth/TurnstileCaptcha";
 
 export default function NewsletterForm() {
   const [email, setEmail] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const websiteRef = useRef<HTMLInputElement>(null);
@@ -15,12 +19,20 @@ export default function NewsletterForm() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
+    if (turnstileSiteKey && !captchaToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/newsletter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), website: websiteRef.current?.value ?? "" }),
+        body: JSON.stringify({
+          email: email.trim(),
+          website: websiteRef.current?.value ?? "",
+          captchaToken: captchaToken ?? "",
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -76,6 +88,7 @@ export default function NewsletterForm() {
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
         </Button>
       </div>
+      <TurnstileCaptcha onChange={setCaptchaToken} />
       <p className="text-xs text-muted-foreground">
         Get exclusive deals. No spam, unsubscribe anytime.
       </p>

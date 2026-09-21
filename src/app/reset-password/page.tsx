@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShoppingCart, Loader2, CheckCircle2 } from "lucide-react";
+import TurnstileCaptcha, {
+  turnstileSiteKey,
+} from "@/components/auth/TurnstileCaptcha";
 import { toast } from "sonner";
 
 function ResetPasswordForm() {
@@ -18,6 +21,7 @@ function ResetPasswordForm() {
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -35,13 +39,22 @@ function ResetPasswordForm() {
       toast.error("Passwords do not match");
       return;
     }
+    if (turnstileSiteKey && !captchaToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
     setResetting(true);
 
     try {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email, password }),
+        body: JSON.stringify({
+          token,
+          email,
+          password,
+          captchaToken: captchaToken ?? "",
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -100,6 +113,8 @@ function ResetPasswordForm() {
           required
         />
       </div>
+
+      <TurnstileCaptcha onChange={setCaptchaToken} />
 
       <Button type="submit" className="w-full" size="lg" disabled={resetting}>
         {resetting ? (

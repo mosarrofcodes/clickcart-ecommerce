@@ -491,3 +491,4 @@
 - Project is learning-focused but should be production-ready
 - All code should be TypeScript
 - Commit after each unit completion
+- **Post-Phase-14 hardening (Sep 22):** Cloudflare Turnstile CAPTCHA implemented (server `siteverify` lib `src/lib/turnstile.ts` + self-configuring `TurnstileCaptcha` widget on login/register/forgot/reset-password/contact/newsletter). Self-activated when `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` are both set; honeypot retained as the fallback when unconfigured

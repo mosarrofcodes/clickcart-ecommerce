@@ -7,22 +7,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShoppingCart, Loader2, CheckCircle2 } from "lucide-react";
+import TurnstileCaptcha, {
+  turnstileSiteKey,
+} from "@/components/auth/TurnstileCaptcha";
 import { toast } from "sonner";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (turnstileSiteKey && !captchaToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
     setSending(true);
 
     try {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, captchaToken: captchaToken ?? "" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -77,6 +85,8 @@ export default function ForgotPasswordPage() {
                   required
                 />
               </div>
+
+              <TurnstileCaptcha onChange={setCaptchaToken} />
 
               <Button
                 type="submit"
