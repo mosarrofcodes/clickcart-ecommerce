@@ -38,37 +38,43 @@ async function main() {
       name: "Electronics",
       slug: "electronics",
       description: "Gadgets, devices, and tech accessories",
-      image: "https://picsum.photos/seed/clickcart-electronics/800/400",
+      image:
+        "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800&h=400&auto=format&fit=crop",
     },
     {
       name: "Clothing",
       slug: "clothing",
       description: "Fashion apparel and accessories",
-      image: "https://picsum.photos/seed/clickcart-clothing/800/400",
+      image:
+        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=800&h=400&auto=format&fit=crop",
     },
     {
       name: "Furniture",
       slug: "furniture",
       description: "Home and office furniture",
-      image: "https://picsum.photos/seed/clickcart-furniture/800/400",
+      image:
+        "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?q=80&w=800&h=400&auto=format&fit=crop",
     },
     {
       name: "Groceries",
       slug: "groceries",
       description: "Food, beverages, and daily essentials",
-      image: "https://picsum.photos/seed/clickcart-groceries/800/400",
+      image:
+        "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&h=400&auto=format&fit=crop",
     },
     {
       name: "Beauty",
       slug: "beauty",
       description: "Skincare, makeup, and personal care",
-      image: "https://picsum.photos/seed/clickcart-beauty/800/400",
+      image:
+        "https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=800&h=400&auto=format&fit=crop",
     },
     {
       name: "Sports",
       slug: "sports-accessories",
       description: "Sports equipment and fitness gear",
-      image: "https://picsum.photos/seed/clickcart-sports/800/400",
+      image:
+        "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=800&h=400&auto=format&fit=crop",
     },
   ];
 
@@ -91,7 +97,8 @@ async function main() {
       description: "Apple iPhone 15 Pro with A17 Pro chip, titanium design, and 48MP camera system.",
       price: 159999,
       stock: 50,
-      image: "https://picsum.photos/seed/clickcart-iphone-15-pro/600/400",
+      image:
+        "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "Apple",
       sku: "ELEC-001",
       weight: 0.187,
@@ -104,7 +111,8 @@ async function main() {
       description: "Samsung flagship with S Pen, 200MP camera, and AI-powered features.",
       price: 189999,
       stock: 35,
-      image: "https://picsum.photos/seed/clickcart-galaxy-s24/600/400",
+      image:
+        "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "Samsung",
       sku: "ELEC-002",
       weight: 0.232,
@@ -117,7 +125,8 @@ async function main() {
       description: "Apple MacBook Pro with M3 Pro chip, 18GB RAM, 512GB SSD.",
       price: 219999,
       stock: 20,
-      image: "https://picsum.photos/seed/clickcart-macbook-pro/600/400",
+      image:
+        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "Apple",
       sku: "ELEC-003",
       weight: 1.55,
@@ -130,7 +139,8 @@ async function main() {
       description: "Industry-leading noise canceling wireless headphones with 30-hour battery.",
       price: 48999,
       stock: 75,
-      image: "https://picsum.photos/seed/clickcart-sony-headphones/600/400",
+      image:
+        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "Sony",
       sku: "ELEC-004",
       weight: 0.25,
@@ -144,7 +154,8 @@ async function main() {
       description: "100% cotton comfortable everyday t-shirt.",
       price: 899,
       stock: 200,
-      image: "https://picsum.photos/seed/clickcart-tshirt/600/400",
+      image:
+        "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "BasicWear",
       sku: "CLO-001",
       weight: 0.2,
@@ -157,7 +168,8 @@ async function main() {
       description: "Modern slim fit denim jeans with stretch comfort.",
       price: 2499,
       stock: 150,
-      image: "https://picsum.photos/seed/clickcart-jeans/600/400",
+      image:
+        "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "DenimCo",
       sku: "CLO-002",
       weight: 0.6,
@@ -170,7 +182,8 @@ async function main() {
       description: "Waterproof winter jacket with fleece lining and hood.",
       price: 4999,
       stock: 80,
-      image: "https://picsum.photos/seed/clickcart-jacket/600/400",
+      image:
+        "https://images.unsplash.com/photo-1544022613-e87ca75a784a?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "WinterWear",
       sku: "CLO-003",
       weight: 1.2,
@@ -184,7 +197,8 @@ async function main() {
       description: "Adjustable lumbar support, breathable mesh, and armrests.",
       price: 15999,
       stock: 40,
-      image: "https://picsum.photos/seed/clickcart-office-chair/600/400",
+      image:
+        "https://images.unsplash.com/photo-1592078615290-033ee584e267?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "ComfortPlus",
       sku: "FUR-001",
       weight: 15,
@@ -197,7 +211,8 @@ async function main() {
       description: "Electric height-adjustable standing desk with memory presets.",
       price: 24999,
       stock: 25,
-      image: "https://picsum.photos/seed/clickcart-standing-desk/600/400",
+      image:
+        "https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "WorkFit",
       sku: "FUR-002",
       weight: 30,
@@ -211,7 +226,8 @@ async function main() {
       description: "Premium Arabica coffee beans, 1kg pack.",
       price: 1299,
       stock: 300,
-      image: "https://picsum.photos/seed/clickcart-coffee/600/400",
+      image:
+        "https://images.unsplash.com/photo-1447933601403-0c6688de566e?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "BrewMaster",
       sku: "GRO-001",
       weight: 1,
@@ -224,7 +240,8 @@ async function main() {
       description: "Cold-pressed extra virgin olive oil, 500ml.",
       price: 999,
       stock: 250,
-      image: "https://picsum.photos/seed/clickcart-olive-oil/600/400",
+      image:
+        "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "Mediterra",
       sku: "GRO-002",
       weight: 0.5,
@@ -238,7 +255,8 @@ async function main() {
       description: "Brightening vitamin C serum with hyaluronic acid, 30ml.",
       price: 1899,
       stock: 120,
-      image: "https://picsum.photos/seed/clickcart-serum/600/400",
+      image:
+        "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "GlowUp",
       sku: "BEA-001",
       weight: 0.05,
@@ -252,7 +270,8 @@ async function main() {
       description: "Non-slip exercise yoga mat, 6mm thick.",
       price: 1499,
       stock: 180,
-      image: "https://picsum.photos/seed/clickcart-yoga-mat/600/400",
+      image:
+        "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "FitLife",
       sku: "SPO-001",
       weight: 1,
@@ -265,7 +284,8 @@ async function main() {
       description: "Adjustable dumbbell set, 5-25kg per hand.",
       price: 9999,
       stock: 30,
-      image: "https://picsum.photos/seed/clickcart-dumbbells/600/400",
+      image:
+        "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=800&h=600&auto=format&fit=crop",
       brand: "PowerLift",
       sku: "SPO-002",
       weight: 25,

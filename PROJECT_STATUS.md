@@ -1,6 +1,6 @@
 # ClickCart — Project Status
 
-**Last updated:** Sep 22, 2026
+**Last updated:** Sep 23, 2026
 
 ## Overall Progress
 
@@ -19,7 +19,7 @@
 | Phase 11: Email & Notifications | COMPLETE ✅ | 100%     |
 | Phase 12: Testing               | COMPLETE ✅ | 100%     |
 | Phase 13: Performance & SEO     | COMPLETE ✅ | 100%     |
-| Phase 14: Deployment            | IN PROGRESS | 80%      |
+| Phase 14: Deployment            | IN PROGRESS | 90%      |
 
 ## Phase 1: Backend Foundation
 
@@ -460,18 +460,23 @@ Business-facing features added on top of the 14 phases to make the storefit for 
 - [x] Phases 10–14 + pre-launch hardening committed (`cc20d59`) and pushed; branch `main` in sync with `origin`
 - [x] **LIVE at https://clickcart-ecommerce.vercel.app** — smoke-tested (home 200, `/api/products` returns prod data, `/api/health` → `{"ok":true}`; deployment eager-builds one preview earlier)
 - [x] Vercel Hobby cron limit (1/day) applied — removed `*/2` health keepalive cron; only daily cancel-stale-pending cron remains
-- [x] **Custom domain attached (Sep 22):** `clickcarts.me` (Namecheap) added to Vercel — apex → 308 → `https://www.clickcarts.me/` (HTTP 200, TLS OK, auth verified live). **Still pending:** set `NEXT_PUBLIC_APP_URL=https://www.clickcarts.me` in Vercel env + redeploy (canonical/OG/sitemap still use the old `vercel.app` domain); update Google OAuth callback URI to `https://www.clickcarts.me/api/auth/callback/google`
+- [x] **Custom domain attached (Sep 22):** `clickcarts.me` (Namecheap) added to Vercel — apex → 308 → `https://www.clickcarts.me/` (HTTP 200, TLS OK, auth verified live). **Done (Sep 23):** `NEXT_PUBLIC_APP_URL=https://www.clickcarts.me` set in Vercel env + redeployed — canonical, OG, sitemap.xml, robots.ts, JSON-LD all verified serving `www.clickcarts.me`; Google OAuth callback URI updated to `https://www.clickcarts.me/api/auth/callback/google`
+- [x] **Cloudflare Turnstile ACTIVE (Sep 23):** `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in Vercel env + production redeploy. Verified live: site key `0x4AAAAAAFATMrcE5sIVl78g` inlined in production bundle (chunk `120d0y6e-sn1w.js`), checkbox renders on `/signin` — CAPTCHA active on login/register/forgot/reset-password/contact/newsletter
 - [ ] **Needs user:** switch SSLCommerz to live credentials when ready (`SSLCOMMERZ_IS_LIVE=true`)
 - [ ] **Needs user:** live Resend keys + from-domain, Cloudinary keys (enables product image uploads)
 
 ## Current Active Task
 
-- **Phase 14:** Deployment — **PRODUCTION IS LIVE** (Vercel + Neon prod DB seeded; custom domain `clickcarts.me` attached → `www.clickcarts.me`). Security sprint done (rate limiting, honeypot, headers, env-driven admin seed password) + Cloudflare Turnstile CAPTCHA implemented (server verify lib + self-configuring widget on 6 forms; activates when keys are added) + **checkout→login loop bug fixed** (sign-in/up now honor `callbackUrl`; see Recent Changes). Remaining items need user accounts/decisions: set `NEXT_PUBLIC_APP_URL=https://www.clickcarts.me` in Vercel env + redeploy, live SSLCommerz credentials, live Resend/Cloudinary keys, add Turnstile keys to Vercel env.
+- **Phase 14:** Deployment — **PRODUCTION IS LIVE** (Vercel + Neon prod DB seeded; custom domain `clickcarts.me` attached → `www.clickcarts.me`). Security sprint done (rate limiting, honeypot, headers, env-driven admin seed password) + Cloudflare Turnstile CAPTCHA implemented + **checkout→login loop bug fixed** (sign-in/up now honor `callbackUrl`; see Recent Changes). **Checklist progress (Sep 23):** checkout→login fix pushed (`22ab6f2`), `NEXT_PUBLIC_APP_URL=https://www.clickcarts.me` live (canonical/OG/sitemap/JSON-LD verified), Turnstile keys added to Vercel env. Remaining items need user accounts/decisions: **live SSLCommerz credentials** (`SSLCOMMERZ_IS_LIVE=true`), **live Resend keys + from-domain**, **live Cloudinary keys**.
+
+- **Go-live wind-down (Sep 23):** tasks 1–3 of the handover checklist completed — (1) checkout→login fix confirmed committed + pushed (`22ab6f2`, working tree clean), (2) `NEXT_PUBLIC_APP_URL` updated to `https://www.clickcarts.me` in Vercel env + redeployed (live proof: `/sitemap.xml` fully `www.clickcarts.me`, `rel=canonical` + `og:url` = `https://www.clickcarts.me`, WebSite/Organization JSON-LD updated; Google OAuth callback URI updated), (3) Turnstile **active on live site** — after adding `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` to Vercel env (Production scope) + redeploy, the bundle now inlines site key `0x4AAAAAAFATMrcE5sIVl78g` and the checkbox renders on `/signin`. Note for the record: the first "done" claim was premature — the key wasn't in the build until a redeploy ran after the env change.
 
 - **Bug fix (Sep 22): "clicking Checkout keeps sending me to the login page."** Root cause: the `/signin` and `/signup` pages ignored the middleware's `?callbackUrl=…` param and did `router.replace("/")` after auth — so a guest who clicked Checkout (middleware → `/signin?callbackUrl=/checkout`) landed on the **homepage** after logging in, not the checkout. Repeated checkout attempts kept re-triggering login (and could hit the 10/15-min login rate limit) → felt like an endless loop. Fix: new `src/lib/callback-url.ts` `safeCallbackUrl()` (rejects external/protocol-relative/backslash values — no open redirect), `/signin` + `/signup` now read `callbackUrl` (via `useSearchParams` under a `Suspense` boundary), pass it through the sign-in/up Google buttons and cross-links, and redirect post-login **with a full-page navigation** `window.location.assign()` so the just-created session cookie is always attached (the client-side `router.replace` RSC fetch right after login races the cookie jar and gets bounced back to `/signin` by the middleware — reproduced at loopback latency). Also hardened E2E: checkout spec locators (header cart is a Link, logo "Click**Cart**" matched `/cart/i`; cart count is accumulation-prone for logged-in accounts → assert the cart drawer opens instead), new regression test "guest adding to cart gets sent to sign-in and returned to /checkout", and `playwright.config.ts` `timeout: 120_000` (Neon cold-start blew the default 30s). Verified: **5/5 Playwright E2E pass** (auth, admin, checkout incl. new regression), **23 suites / 133 Jest tests pass**, lint clean, `tsc --noEmit` clean, production build clean. Live-probe confirmed prod root cause (login → home, no cookie problem; re-clicking Checkout after login worked).
 
 ## Recent Changes
 
+- **Real product/category images (Sep 23):** replaced all picsum placeholder photos with verified title-matching Unsplash CDN images (iPhone photo for iPhone 15 Pro, dumbbells photo for Adjustable Dumbbells, etc. — 14 products + 6 categories). Added `images.unsplash.com` to `next.config.mjs` `remotePatterns` (Next/Image would have blocked it), updated `prisma/seed.ts`, and added `scripts/update-images.ts` (patches a DB's images by product SKU + category slug). Dry-run on dev DB: 20/20 rows updated. Prod DB still needs the script run with the prod `DATABASE_URL`. Verified lint clean, `tsc --noEmit` clean, production build passes (after dev DB patch). Note: Cloudinary admin upload still pending live keys (upload shows "Check your Cloudinary credentials" in prod).
+- **Cloudflare Turnstile ACTIVE (Sep 23):** keys were added to Vercel env but the CAPTCHA still wasn't showing — root cause: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` was missing from Vercel env (bundle scan showed `turnstileSiteKey` = `""`), and once added it needed a **redeploy** to be inlined. After the user created the Turnstile widget (hostname left empty) + set both keys + redeployed, bundle scan confirms the site key `0x4AAAAAAFATMrcE5sIVl78g` is inlined and the checkbox renders on `/signin`.
 - **Cloudflare Turnstile CAPTCHA (Sep 22):** server verify lib (`src/lib/turnstile.ts` — Cloudflare `siteverify`, auto-disabled until `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` both set) + self-configuring `TurnstileCaptcha` client widget (script loads on demand, explicit render, renders null without a site key). Enforced server-side on 6 routes (login, register, forgot/reset-password, contact, newsletter; honeypot kept as fallback) with the widget on 6 forms (signin, signup, forgot/reset-password pages, ContactForm, NewsletterForm). `.env.example` documents the keys. Tests added (`__tests__/lib/turnstile.test.ts` 9 tests + `TurnstileCaptcha.test.tsx`) → **23 suites / 133 tests pass**; lint, `tsc --noEmit`, and production build all clean
 - **Go-live + security sprint (Sep 21):** 
   - Committed + pushed Phases 10–14 and pre-launch hardening (`cc20d59`) and security sprint (`c48ed5e`); removed keepalive cron (`e339816`) — Vercel Hobby allows 1 cron/day
@@ -598,8 +603,9 @@ Business-facing features added on top of the 14 phases to make the storefit for 
 
 ## Next Steps
 
-1. **User (domain env, ~2 min):** set `NEXT_PUBLIC_APP_URL=https://www.clickcarts.me` in Vercel env (Production) → redeploy → verify canonical/OG/sitemap now use the real domain (`/api/health` warm); update Google OAuth redirect URI in the Google Cloud console to `https://www.clickcarts.me/api/auth/callback/google`
-2. **Turnstile activation (user, free):** create a Cloudflare account → mint Turnstile keys → set `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in Vercel env (code is deploy-ready; re-verify with a login after adding)
+1. ~~**User (domain env):** set `NEXT_PUBLIC_APP_URL=https://www.clickcarts.me` in Vercel env (Production) → redeploy~~ — **DONE (Sep 23):** canonical/OG/sitemap verified on `www.clickcarts.me`; Google OAuth redirect URI updated
+2. ~~**Turnstile activation (user, free):** mint Cloudflare Turnstile keys → set in Vercel env~~ — **DONE (Sep 23):** keys active, site key `0x4AAAAAAFATMrcE5sIVl78g` inlined in prod bundle, checkbox renders on `/signin`
+2b. **Demo images (Sep 23):** seed + dev DB swapped picsum random photos → real title-matching Unsplash CDN photos (14 products + 6 categories, all URLs verified 200). `next.config.mjs` allows `images.unsplash.com`; `prisma/seed.ts` updated; `scripts/update-images.ts` patches a DB by SKU/slug. **PROD action:** run the script with the prod `DATABASE_URL` (locally: `$env:DATABASE_URL="<prod>"; npx tsx scripts/update-images.ts`) then push+deploy so `images.unsplash.com` is allowed in the running build
 3. **Live credentials (user accounts):** SSLCommerz live merchant → `SSLCOMMERZ_IS_LIVE=true`; Resend domain + API key (enables real email templates); Cloudinary keys (enables admin image upload)
 4. **Monitoring (recommended):** UptimeRobot ping to `/api/health` every 5 min (keeps Neon warm + alerting); Sentry for runtime error tracking
 5. **Optional hardening:** Vercel KV-backed global rate limiting; security headers tune (CSP)

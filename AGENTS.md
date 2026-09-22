@@ -25,17 +25,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Phase 14 (deployment) — app is LIVE at https://clickcart-ecommerce.vercel.app** on Vercel + Neon prod DB (`ep-divine-king-b41ly5f0`, seeded: admin, 6 categories, 14 products, 3 coupons, site settings). All code committed (`cc20d59`), pushed to `origin/main`, GitHub Actions CI active
 - Security hardening (committed `c48ed5e`): env-driven `ADMIN_SEED_PASSWORD`, debug artifacts removed, in-memory rate limiting (login/register/forgot/reset-password/contact/newsletter/coupon-validate), honeypot fields on Contact/Newsletter, security headers (HSTS preload, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy)
 - Cloudflare Turnstile CAPTCHA: server verify lib (`src/lib/turnstile.ts`) + self-configuring widget (`TurnstileCaptcha`) wired into login/register/forgot/reset-password/contact/newsletter; active only when `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` set (honeypot remains as fallback). 23 suites / 133 tests pass
-- **Checkout → login loop fixed (Sep 22, committed locally, NOT pushed):** `/signin` + `/signup` now honor the middleware `?callbackUrl=…` param via `safeCallbackUrl` (`src/lib/callback-url.ts`), redirect after auth with a full-page `window.location.assign` (client `router.replace` to a protected route right after login races the session cookie and bounces back — reproduced at loopback; prod already fine), plus E2E regressions (guest→checkout→sign-in→back at `/checkout`) and hardened checkout spec locators, `playwright.config.ts` `timeout: 120_000`
-- Custom domain `clickcarts.me` attached to Vercel (apex → 308 → `www.clickcarts.me`); `NEXT_PUBLIC_APP_URL` still needs updating to `https://www.clickcarts.me` in Vercel env + redeploy
+- **Checkout → login loop fixed (Sep 22, committed `22ab6f2` + pushed):** `/signin` + `/signup` now honor the middleware `?callbackUrl=…` param via `safeCallbackUrl` (`src/lib/callback-url.ts`), redirect after auth with a full-page `window.location.assign` (client `router.replace` to a protected route right after login races the session cookie and bounces back — reproduced at loopback; prod already fine), plus E2E regressions (guest→checkout→sign-in→back at `/checkout`) and hardened checkout spec locators, `playwright.config.ts` `timeout: 120_000`
+- Custom domain `clickcarts.me` attached to Vercel (apex → 308 → `www.clickcarts.me`); **done (Sep 23):** `NEXT_PUBLIC_APP_URL=https://www.clickcarts.me` in Vercel env + redeployed (canonical/OG/sitemap/JSON-LD verified live); Google OAuth callback URI updated
 - Vercel Hobby limit: only 1 cron/day → daily `cancel-stale-pending` only (health keepalive cron removed); free UptimeRobot ping to `/api/health` is the recommended warm-up
 - `.env.example` rebuilt and committed with all keys documented; `DATABASE_KEEPALIVE_MS=30000` in dev `.env`
 - See `PROJECT_STATUS.md` for the full phase-by-phase record
 
 ### Remaining (Needs User Account/Decisions)
 
-- Custom domain `clickcarts.me` attached → update `NEXT_PUBLIC_APP_URL` to `https://www.clickcarts.me` in Vercel env + redeploy (also Google OAuth callback URI)
-- Live SSLCommerz merchant creds (`SSLCOMMERZ_IS_LIVE=true`), live Resend + Cloudinary keys
-- Add Turnstile keys (`TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) to Vercel env to activate the CAPTCHA (code already deploy-ready)
+- Live SSLCommerz merchant creds (`SSLCOMMERZ_IS_LIVE=true`)
+- Live Resend + Cloudinary keys
+- **Done (Sep 23):** `NEXT_PUBLIC_APP_URL=https://www.clickcarts.me` set in Vercel env + redeployed (canonical/OG/sitemap/JSON-LD verified live); Google OAuth callback URI updated; Turnstile keys added to Vercel env + redeployed (CAPTCHA verified live on all 6 forms — site key inlined in prod bundle); checkout→login fix committed (`22ab6f2`) + pushed
 - Optional: Vercel KV rate limiting, Sentry monitoring, rotate Neon prod DB password
 
 ## Roadmap
