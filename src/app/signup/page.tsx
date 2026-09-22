@@ -1,8 +1,9 @@
 "use client";
 
+import { Suspense } from "react";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +13,13 @@ import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import TurnstileCaptcha, {
   turnstileSiteKey,
 } from "@/components/auth/TurnstileCaptcha";
+import { safeCallbackUrl } from "@/lib/callback-url";
 import { toast } from "sonner";
 
-export default function SignUpPage() {
+function SignUpForm() {
+  const searchParams = useSearchParams();
+  const callbackUrl =
+    safeCallbackUrl(searchParams.get("callbackUrl")) ?? "/";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +50,11 @@ export default function SignUpPage() {
       }
 
       toast.success("Account created! Please sign in.");
-      router.push("/signin");
+      const signInPath =
+        callbackUrl !== "/"
+          ? `/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`
+          : "/signin";
+      router.push(signInPath);
     } catch {
       toast.error("Something went wrong");
     } finally {
@@ -119,12 +128,12 @@ export default function SignUpPage() {
             </Button>
           </form>
 
-          <GoogleSignInButton />
+          <GoogleSignInButton callbackUrl={callbackUrl} />
 
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link
-              href="/signin"
+              href={`/signin${callbackUrl !== "/" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
               className="text-primary font-medium hover:underline"
             >
               Sign In
@@ -133,5 +142,19 @@ export default function SignUpPage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center px-4">
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </main>
+      }
+    >
+      <SignUpForm />
+    </Suspense>
   );
 }

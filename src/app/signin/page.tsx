@@ -1,8 +1,9 @@
 "use client";
 
+import { Suspense } from "react";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,14 +13,17 @@ import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import TurnstileCaptcha, {
   turnstileSiteKey,
 } from "@/components/auth/TurnstileCaptcha";
+import { safeCallbackUrl } from "@/lib/callback-url";
 import { toast } from "sonner";
 
-export default function SignInPage() {
+function SignInForm() {
+  const searchParams = useSearchParams();
+  const callbackUrl =
+    safeCallbackUrl(searchParams.get("callbackUrl")) ?? "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,7 +46,7 @@ export default function SignInPage() {
         toast.error(data.error || "Invalid email or password");
       } else {
         toast.success("Signed in successfully!");
-        router.replace("/");
+        window.location.assign(callbackUrl);
       }
     } catch {
       toast.error("Something went wrong");
@@ -113,12 +117,12 @@ export default function SignInPage() {
             </div>
           </form>
 
-          <GoogleSignInButton />
+          <GoogleSignInButton callbackUrl={callbackUrl} />
 
           <p className="text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link
-              href="/signup"
+              href={`/signup${callbackUrl !== "/" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
               className="text-primary font-medium hover:underline"
             >
               Sign Up
@@ -127,5 +131,19 @@ export default function SignInPage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center px-4">
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </main>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }
